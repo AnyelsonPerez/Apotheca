@@ -6,7 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from apotheca_api.database import Base, engine, get_db
-from apotheca_api.routers import auth
+from apotheca_api.routers import auth, cima
 
 
 @asynccontextmanager
@@ -37,6 +37,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(cima.router)
 
 
 @app.get("/health")
