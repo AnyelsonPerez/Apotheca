@@ -1,0 +1,15 @@
+{
+  "name": "apotheca",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted pharmacy management system",
+  "scripts": {
+    "dev:web": "pnpm --filter @apotheca/web dev",
+    "dev:mobile": "pnpm --filter @apotheca/mobile start",
+    "build:web": "pnpm --filter @apotheca/web build",
+    "lint:web": "pnpm --filter @apotheca/web lint"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
