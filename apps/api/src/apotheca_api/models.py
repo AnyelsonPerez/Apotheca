@@ -71,6 +71,14 @@ class Medication(Base):
     presentation: Mapped["Presentation"] = relationship(back_populates="medications")
     lots: Mapped[list["Lot"]] = relationship(back_populates="medication", cascade="all, delete-orphan")
 
+    @property
+    def active_ingredient_name(self) -> str | None:
+        return self.active_ingredient.name if self.active_ingredient else None
+
+    @property
+    def presentation_name(self) -> str | None:
+        return self.presentation.name if self.presentation else None
+
 
 class Lot(Base):
     __tablename__ = "lots"
