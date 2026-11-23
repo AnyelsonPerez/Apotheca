@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     database_path: Path = Path("data/apotheca.db")
 
-    jwt_secret: str = "change-me-in-production"
+    jwt_secret: str = "apotheca-dev-secret-change-in-production-32b"
     jwt_algorithm: str = "HS256"
     jwt_access_expires_minutes: int = 15
     jwt_refresh_expires_days: int = 30
