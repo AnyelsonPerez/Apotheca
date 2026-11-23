@@ -1,11 +1,16 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from apotheca_api.database import Base, engine, get_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
     yield
 
 
@@ -26,5 +31,9 @@ app.add_middleware(
 
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+async def health(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "connected"}
+    except Exception:
+        return {"status": "degraded", "database": "error"}
