@@ -6,11 +6,18 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from apotheca_api.database import Base, engine, get_db
+from apotheca_api.routers import auth
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    from apotheca_api.seed import seed_settings
+    db = next(get_db())
+    try:
+        seed_settings(db)
+    finally:
+        db.close()
     yield
 
 
@@ -28,6 +35,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router)
 
 
 @app.get("/health")
