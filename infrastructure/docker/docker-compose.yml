@@ -1,0 +1,15 @@
+services:
+  api:
+    build:
+      context: ../../apps/api
+      dockerfile: ../../infrastructure/docker/Dockerfile.api
+    ports:
+      - "8000:8000"
+    volumes:
+      - apotheca-data:/app/data
+    environment:
+      - DATABASE_PATH=/app/data/apotheca.db
+    restart: unless-stopped
+
+volumes:
+  apotheca-data:
