@@ -31,9 +31,6 @@ jobs:
   web:
     name: Web (React)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
 
@@ -45,20 +42,16 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: apps/web/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm build
+        run: pnpm --filter @apotheca/web build
 
   mobile:
     name: Mobile (Expo)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/mobile
     steps:
       - uses: actions/checkout@v4
 
@@ -70,10 +63,9 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: apps/mobile/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Type check
-        run: pnpm exec tsc --noEmit
+        run: pnpm --filter @apotheca/mobile exec tsc --noEmit
