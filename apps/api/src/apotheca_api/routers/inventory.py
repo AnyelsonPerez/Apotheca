@@ -117,7 +117,6 @@ def create_lot(
         user_id=user.id,
         quantity=payload.quantity,
         expiry_date=payload.expiry_date,
-        dosage=payload.dosage,
         daily_dose=payload.daily_dose,
         acquired_at=payload.acquired_at,
     )
@@ -128,13 +127,13 @@ def create_lot(
 
 
 @router.get("/lots", response_model=list[LotResponse])
-def list_lots(db: Session = Depends(get_db)):
-    return db.query(Lot).all()
+def list_lots(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return db.query(Lot).filter(Lot.user_id == user.id).all()
 
 
 @router.put("/lots/{lot_id}", response_model=LotResponse)
-def update_lot(lot_id: str, payload: LotUpdate, db: Session = Depends(get_db)):
-    lot = db.query(Lot).filter(Lot.id == lot_id).first()
+def update_lot(lot_id: str, payload: LotUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    lot = db.query(Lot).filter(Lot.id == lot_id, Lot.user_id == user.id).first()
     if not lot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lote no encontrado")
 
@@ -147,8 +146,8 @@ def update_lot(lot_id: str, payload: LotUpdate, db: Session = Depends(get_db)):
 
 
 @router.delete("/lots/{lot_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_lot(lot_id: str, db: Session = Depends(get_db)):
-    lot = db.query(Lot).filter(Lot.id == lot_id).first()
+def delete_lot(lot_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    lot = db.query(Lot).filter(Lot.id == lot_id, Lot.user_id == user.id).first()
     if not lot:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lote no encontrado")
     db.delete(lot)
@@ -156,7 +155,7 @@ def delete_lot(lot_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[InventoryResponse])
-def get_inventory(db: Session = Depends(get_db)):
+def get_inventory(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     medications = (
         db.query(Medication)
         .options(selectinload(Medication.lots), selectinload(Medication.active_ingredient), selectinload(Medication.presentation))
@@ -164,7 +163,10 @@ def get_inventory(db: Session = Depends(get_db)):
     )
     result = []
     for med in medications:
-        total_quantity = sum(lot.quantity for lot in med.lots)
+        user_lots = [lot for lot in med.lots if lot.user_id == user.id]
+        if not user_lots:
+            continue
+        total_quantity = sum(lot.quantity for lot in user_lots)
         result.append(
             InventoryResponse(
                 id=med.id,
@@ -175,7 +177,7 @@ def get_inventory(db: Session = Depends(get_db)):
                 active_ingredient_name=med.active_ingredient.name if med.active_ingredient else None,
                 presentation_name=med.presentation.name if med.presentation else None,
                 total_quantity=total_quantity,
-                lots=med.lots,
+                lots=user_lots,
             )
         )
     return result

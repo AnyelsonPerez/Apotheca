@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session, selectinload
 
 from apotheca_api.cima import get_cima_client
 from apotheca_api.database import get_db
-from apotheca_api.models import Medication
+from apotheca_api.deps import get_current_user
+from apotheca_api.models import Lot, Medication, User
 
-router = APIRouter(prefix="/cima", tags=["cima"])
+router = APIRouter(prefix="/cima", tags=["cima"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/search")
@@ -18,6 +19,7 @@ async def search_medications(
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     if not nombre and not pactivos:
         raise HTTPException(
@@ -29,14 +31,21 @@ async def search_medications(
     words = query_term.lower().split()
     cima_term = words[0]  # CIMA only supports single-word search
 
+    # Get medication IDs that the user has lots for
+    user_med_ids = {lot.medication_id for lot in db.query(Lot).filter(Lot.user_id == user.id).all()}
+
     # Search local inventory by name, national_code, or active ingredient
+    # (only medications the user actually has in their inventory)
     local_meds = (
         db.query(Medication)
         .outerjoin(Medication.active_ingredient)
         .filter(
-            (Medication.name.ilike(f"%{query_term}%"))
-            | (Medication.national_code.ilike(f"%{query_term}%"))
-            | (Medication.active_ingredient.has(Medication.active_ingredient.property.mapper.class_.name.ilike(f"%{query_term}%")))
+            Medication.id.in_(user_med_ids),
+            (
+                (Medication.name.ilike(f"%{query_term}%"))
+                | (Medication.national_code.ilike(f"%{query_term}%"))
+                | (Medication.active_ingredient.has(Medication.active_ingredient.property.mapper.class_.name.ilike(f"%{query_term}%")))
+            ),
         )
         .options(selectinload(Medication.active_ingredient))
         .all()
@@ -48,8 +57,11 @@ async def search_medications(
                 db.query(Medication)
                 .outerjoin(Medication.active_ingredient)
                 .filter(
-                    (Medication.name.ilike(f"%{w}%"))
-                    | (Medication.active_ingredient.has(Medication.active_ingredient.property.mapper.class_.name.ilike(f"%{w}%")))
+                    Medication.id.in_(user_med_ids),
+                    (
+                        (Medication.name.ilike(f"%{w}%"))
+                        | (Medication.active_ingredient.has(Medication.active_ingredient.property.mapper.class_.name.ilike(f"%{w}%")))
+                    ),
                 )
                 .options(selectinload(Medication.active_ingredient))
                 .all()

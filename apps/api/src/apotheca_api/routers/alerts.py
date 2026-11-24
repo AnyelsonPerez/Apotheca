@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from apotheca_api.config import settings
 from apotheca_api.database import get_db
 from apotheca_api.deps import get_current_user
-from apotheca_api.models import Lot, Medication, NotificationLog, Settings as SettingsModel
+from apotheca_api.models import Lot, Medication, NotificationLog, Settings as SettingsModel, User
 from apotheca_api.schemas_inventory import AlertItem, AlertsResponse
 
 router = APIRouter(prefix="/alerts", tags=["alerts"], dependencies=[Depends(get_current_user)])
@@ -38,7 +38,7 @@ async def _send_ntfy_notification(db: Session, lot: Lot, medication: Medication,
 
 
 @router.get("", response_model=AlertsResponse)
-async def get_alerts(db: Session = Depends(get_db)):
+async def get_alerts(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     expiry_warning_days = int(_get_setting(db, "expiry_warning_days", "30"))
     depletion_threshold_days = int(_get_setting(db, "depletion_threshold_days", "7"))
 
@@ -48,6 +48,7 @@ async def get_alerts(db: Session = Depends(get_db)):
         db.query(Lot)
         .join(Medication, Lot.medication_id == Medication.id)
         .add_columns(Medication.name, Medication.national_code)
+        .filter(Lot.user_id == user.id)
         .all()
     )
     expiry_alerts: list[AlertItem] = []
