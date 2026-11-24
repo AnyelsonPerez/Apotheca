@@ -26,6 +26,8 @@ async def search_medications(
         )
 
     query_term = nombre or pactivos
+    words = query_term.lower().split()
+    cima_term = words[0]  # CIMA only supports single-word search
 
     # Search local inventory by name, national_code, or active ingredient
     local_meds = (
@@ -39,6 +41,23 @@ async def search_medications(
         .options(selectinload(Medication.active_ingredient))
         .all()
     )
+    # If multi-word, also search local by each word
+    if len(words) > 1:
+        for w in words[1:]:
+            extra = (
+                db.query(Medication)
+                .outerjoin(Medication.active_ingredient)
+                .filter(
+                    (Medication.name.ilike(f"%{w}%"))
+                    | (Medication.active_ingredient.has(Medication.active_ingredient.property.mapper.class_.name.ilike(f"%{w}%")))
+                )
+                .options(selectinload(Medication.active_ingredient))
+                .all()
+            )
+            existing_ids = {m.id for m in local_meds}
+            for m in extra:
+                if m.id not in existing_ids:
+                    local_meds.append(m)
     local_results = [
         {
             "nregistro": m.national_code,
@@ -52,13 +71,13 @@ async def search_medications(
         for m in local_meds
     ]
 
-    # Search CIMA
+    # Search CIMA (single word - CIMA API limitation)
     client = get_cima_client()
     try:
         if nombre:
-            data = await client.search_by_name(nombre, page, page_size)
+            data = await client.search_by_name(cima_term, page, page_size)
         else:
-            data = await client.search_by_active_ingredient(pactivos, page, page_size)
+            data = await client.search_by_active_ingredient(cima_term, page, page_size)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -67,6 +86,18 @@ async def search_medications(
 
     local_nregistros = {r["nregistro"] for r in local_results}
     resultados = data.get("resultados", []) or []
+
+    # If multi-word, filter CIMA results to match all words
+    if len(words) > 1:
+        filtered = []
+        for m in resultados:
+            nombre_lower = (m.get("nombre") or "").lower()
+            pactivos_lower = (m.get("pactivos") or "").lower()
+            combined = f"{nombre_lower} {pactivos_lower}"
+            if all(w in combined for w in words):
+                filtered.append(m)
+        resultados = filtered
+
     cima_results = [
         {
             "nregistro": m.get("nregistro"),
