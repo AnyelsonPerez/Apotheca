@@ -6,6 +6,8 @@ on:
     paths:
       - 'apps/mobile/**'
       - '.github/workflows/release-apk.yml'
+      - '.npmrc'
+      - 'pnpm-lock.yaml'
   workflow_dispatch:
 
 jobs:
