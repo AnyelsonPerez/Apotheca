@@ -30,7 +30,6 @@ export interface Lot {
   user_id: string
   quantity: number
   expiry_date: string | null
-  dosage: string | null
   daily_dose: number | null
   acquired_at: string | null
   created_at: string

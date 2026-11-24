@@ -7,7 +7,6 @@ class LotCreate(BaseModel):
     medication_id: str
     quantity: int = Field(ge=0, default=0)
     expiry_date: datetime | None = None
-    dosage: str | None = None
     daily_dose: float | None = None
     acquired_at: datetime | None = None
 
@@ -15,7 +14,6 @@ class LotCreate(BaseModel):
 class LotUpdate(BaseModel):
     quantity: int | None = Field(ge=0, default=None)
     expiry_date: datetime | None = None
-    dosage: str | None = None
     daily_dose: float | None = None
     acquired_at: datetime | None = None
 
@@ -26,7 +24,6 @@ class LotResponse(BaseModel):
     user_id: str
     quantity: int
     expiry_date: datetime | None = None
-    dosage: str | None = None
     daily_dose: float | None = None
     acquired_at: datetime | None = None
     created_at: datetime

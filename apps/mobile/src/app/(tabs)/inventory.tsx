@@ -15,7 +15,6 @@ export default function InventoryScreen() {
   const [modalMed, setModalMed] = useState<InventoryItem | null>(null);
   const [quantity, setQuantity] = useState('');
   const [dailyDose, setDailyDose] = useState('');
-  const [dosage, setDosage] = useState('');
 
   const createLot = useMutation({
     mutationFn: () =>
@@ -25,7 +24,6 @@ export default function InventoryScreen() {
           medication_id: modalMed?.id,
           quantity: Number(quantity) || 0,
           daily_dose: dailyDose ? Number(dailyDose) : null,
-          dosage: dosage || null,
         }),
       }),
     onSuccess: () => {
@@ -33,7 +31,6 @@ export default function InventoryScreen() {
       setModalMed(null);
       setQuantity('');
       setDailyDose('');
-      setDosage('');
     },
   });
 
@@ -105,13 +102,6 @@ export default function InventoryScreen() {
                 onChangeText={setDailyDose}
                 mode="outlined"
                 keyboardType="numeric"
-                style={styles.input}
-              />
-              <TextInput
-                label="Posología"
-                value={dosage}
-                onChangeText={setDosage}
-                mode="outlined"
                 style={styles.input}
               />
             </Card.Content>

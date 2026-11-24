@@ -88,7 +88,6 @@ class Lot(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     expiry_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    dosage: Mapped[str | None] = mapped_column(String(255), nullable=True)
     daily_dose: Mapped[float | None] = mapped_column(Float, nullable=True)
     acquired_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
