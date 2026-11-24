@@ -1,34 +1,63 @@
 ﻿# Apotheca
 
-Apotheca es una solución self-hosted para la gestión doméstica de medicamentos.
+Apotheca is a self-hosted pharmacy management system for home use.
 
-- Búsqueda de medicamentos por nombre o principio activo contra el catálogo oficial CIMA (AEMPS)
-- Inventario por lotes con cantidad, fecha de caducidad y dosis diaria
-- Auto-rellenado de cantidad del lote desde las presentaciones de CIMA
-- Alertas de caducidad y de agotamiento estimado
-- Web app (React + Mantine) y Android app (React Native + Expo)
-- API REST (FastAPI + SQLAlchemy + SQLite)
-- Despliegue con un solo comando en Proxmox LXC
+- Search medications by brand name or active ingredient against the official AEMPS CIMA catalog
+- Lot-based inventory with quantity, expiration date, and daily dose
+- Auto-fill lot quantity from CIMA pharmaceutical presentations
+- Expiration and stock depletion alerts
+- Web app (React + Mantine) and Android app (React Native + Expo)
+
+## Quick Start
+
+### Docker (recommended)
+
+```bash
+git clone https://github.com/AnyelsonPerez/Apotheca.git
+cd Apotheca/infrastructure/docker
+docker compose up -d --build
+```
+
+| Service | Port | URL |
+|---------|------|-----|
+| Web UI  | 80   | http://localhost |
+| API     | 8000 | http://localhost:8000 |
+| API Docs| 8000 | http://localhost:8000/docs |
+
+Data persists in a Docker volume (`apotheca-data`).
+
+### Proxmox VE
+
+Apotheca can be deployed as an LXC container on Proxmox VE using
+[community-scripts](https://github.com/community-scripts/ProxmoxVE).
+Run this on your Proxmox host:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/apotheca.sh)"
+```
+
+Updates are handled from inside the container:
+
+```bash
+pct enter <CT_ID>
+# inside the container:
+update
+```
 
 ## Stack
 
-| Capa | Tecnología |
-|------|-----------|
+| Layer | Technology |
+|-------|-----------|
 | Backend API | FastAPI |
 | ORM | SQLAlchemy 2.x |
-| Migraciones | Alembic |
-| Base de datos | SQLite |
-| Autenticación | JWT + Refresh Token |
-| Hash contraseñas | Argon2 |
+| Database | SQLite |
+| Auth | JWT + Refresh Tokens + Argon2 |
 | Frontend Web | React + Vite + TypeScript |
 | UI Web | Mantine |
-| Estado servidor | TanStack Query |
 | App Android | React Native + Expo |
-| Escáner | react-native-vision-camera |
-| Notificaciones | ntfy |
-| Contenedores | Docker + Docker Compose |
 
-## Estructura del monorepo
+## Repository Structure
+
 ```
 apotheca/
 ├── apps/
@@ -37,95 +66,34 @@ apotheca/
 │   └── mobile/           # React Native + Expo
 ├── infrastructure/
 │   ├── docker/           # Dockerfiles + docker-compose + nginx
-│   └── proxmox/          # Script de despliegue en LXC
-├── docs/                 # Documentación
-└── .github/workflows/    # CI
+│   └── proxmox/          # LXC scripts (community-scripts compatible)
+└── docs/
 ```
 
----
+## Development
 
-## Despliegue en Proxmox (recomendado)
+### Prerequisites
+- Python 3.12+ with [uv](https://docs.astral.sh/uv/)
+- Node.js 22+ with pnpm
 
-Un solo script crea un contenedor LXC en tu Proxmox, instala Docker, clona el
-repositorio y lanza la API + Web. Ejecútalo en el host de Proxmox como root:
-
-```bash
-# Descargar y ejecutar (CT ID 220, IP 10.10.0.220)
-bash <(curl -fsSL https://raw.githubusercontent.com/AnyelsonPerez/Apotheca/main/infrastructure/proxmox/install.sh) 220 10.10.0.220
-```
-
-O si ya tienes el repo clonado:
-
-```bash
-bash infrastructure/proxmox/install.sh 220 10.10.0.220
-```
-
-Parámetros (opcionales):
-
-| Parámetro | Default | Descripción |
-|-----------|---------|-------------|
-| CT_ID | 220 | ID del contenedor LXC |
-| CT_IP | 10.10.0.220 | IP estática del contenedor |
-| Gateway | auto-detectado | Gateway de la red |
-
-Una vez terminado:
-
-1. **Web UI** → `http://10.10.0.220` — Registra tu primer usuario
-2. **App Android** → ve a `http://10.10.0.220/app` para escanear el QR y descargar el APK
-3. **En la app** → Configuración → URL de la API → `http://10.10.0.220`
-
-### Gestión del contenedor
-
-```bash
-pct enter 220                          # Entrar al contenedor
-pct reboot 220                         # Reiniciar
-pct stop 220                           # Parar
-
-# Dentro del contenedor:
-cd /opt/apotheca/infrastructure/docker
-docker compose logs -f                 # Ver logs
-docker compose pull && docker compose up -d  # Actualizar
-```
-
----
-
-## Desarrollo local
-
-### Requisitos
-- Python 3.12+ con [uv](https://docs.astral.sh/uv/)
-- Node.js 22+ con pnpm
-- Android Studio (para móvil, opcional)
-
-### 1. Clonar
-```bash
-git clone https://github.com/AnyelsonPerez/Apotheca.git
-cd Apotheca
-```
-
-### 2. API (FastAPI)
+### API
 ```bash
 cd apps/api
 uv sync
 uv run uvicorn apotheca_api.app:app --reload --host 0.0.0.0 --port 8000
 ```
-La API se inicia en `http://localhost:8000`. Documentación Swagger en `/docs`.
 
-### 3. Web (React)
+### Web
 ```bash
 pnpm install
 pnpm dev:web
 ```
-La web se inicia en `http://localhost:5173` con proxy a la API.
 
-### 4. Móvil (Expo)
+### Mobile
 ```bash
 pnpm dev:mobile
 ```
-Abrir en emulador Android o con la app Expo Go.
 
-### Docker (local)
-```bash
-cd infrastructure/docker
-docker compose up -d --build
-```
-Web en `http://localhost`, API en `http://localhost:8000`.
+## License
+
+MIT
