@@ -8,7 +8,7 @@
 # Installs natively in the container (no Docker, no nesting).
 set -euo pipefail
 
-# ── Colors ────────────────────────────────────────────────────────────────────
+# -- Colors --
 YW=$(printf "\033[33m")
 RD=$(printf "\033[01;31m")
 GN=$(printf "\033[1;92m")
@@ -21,27 +21,25 @@ REPO="https://github.com/AnyelsonPerez/Apotheca.git"
 INSTALL_DIR="/opt/apotheca"
 DATA_DIR="/var/lib/apotheca"
 
-# ── Header ────────────────────────────────────────────────────────────────────
+# -- Header --
 header_info() {
   clear
-  cat << 'BANNER'
-
-    ___                    __     __
-   /   |    ____   ____   / /_   / /_   ___   _____  ____ _
-  / /| |   / __ \ / __ \ / __/  / __ \ / _ \ / ___/ / __  /
- / ___ |  / /_/ // /_/ // /_   / / / //  __// /__  / /_/ /
-/_/  |_| / .___/ \____/ \__/  /_/ /_/ \___/ \___/  \__,_/
-        /_/
-      Self-hosted pharmacy management
-BANNER
+  printf "\n"
+  printf "    ___                    __     __\n"
+  printf "   /   |    ____   ____   / /_   / /_   ___   _____  ____ _\n"
+  printf "  / /| |   / __ \\ / __ \\ / __/  / __ \\ / _ \\ / ___/ / __  /\n"
+  printf " / ___ |  / /_/ // /_/ // /_   / / / //  __// /__  / /_/ /\n"
+  printf "/_/  |_| / .___/ \\____/ \\__/  /_/ /_/ \\___/ \\___/  \\__,_/\n"
+  printf "        /_/\n"
+  printf "      Self-hosted pharmacy management\n\n"
 }
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- Helpers --
 msg_info() { echo -e " ${BL}[INFO]${CL} ${1}"; }
 msg_ok()   { echo -e " ${GN}[OK]${CL}   ${1}"; }
 msg_error(){ echo -e " ${RD}[ERROR]${CL} ${1}"; exit 1; }
 
-# ── Detect defaults ───────────────────────────────────────────────────────────
+# -- Detect defaults --
 DEFAULT_CT_ID=$(pvesh get /cluster/nextid 2>/dev/null | tr -d '"' || echo "200")
 DEFAULT_GW=$(ip route | awk '/default/ {print $3; exit}')
 
@@ -73,7 +71,7 @@ header_info
 echo -e "${GN}Welcome to the ${APP} LXC installer!${CL}"
 echo ""
 
-# ── Interactive prompts ───────────────────────────────────────────────────────
+# -- Interactive prompts --
 read -rp "$(echo -e "${BL}Container ID [${DEFAULT_CT_ID}]: ${CL}")" CT_ID
 CT_ID="${CT_ID:-$DEFAULT_CT_ID}"
 
@@ -103,7 +101,7 @@ echo -e "  Data dir:    ${DATA_DIR}"
 echo ""
 read -rp "$(echo -e "${YW}Press Enter to continue, Ctrl+C to abort...${CL}")"
 
-# ── 1. Download template ──────────────────────────────────────────────────────
+# -- 1. Download template --
 msg_info "Updating LXC template cache"
 pveam update -q 2>/dev/null || true
 
@@ -113,7 +111,7 @@ if ! pveam list "$TEMPLATE_STORAGE" 2>/dev/null | grep -q "$TEMPLATE"; then
 fi
 msg_ok "Template ready"
 
-# ── 2. Create container ───────────────────────────────────────────────────────
+# -- 2. Create container --
 msg_info "Creating LXC container ${CT_ID}"
 pct create "$CT_ID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
   --arch amd64 \
@@ -128,72 +126,40 @@ pct create "$CT_ID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
   --start 0
 msg_ok "Container ${CT_ID} created"
 
-# ── 3. Start ─────────────────────────────────────────────────────────────────
+# -- 3. Start --
 msg_info "Starting container"
 pct start "$CT_ID"
 sleep 5
 msg_ok "Container started"
 
-# ── 4. Install system dependencies ───────────────────────────────────────────
+# -- 4. Install system dependencies --
 msg_info "Installing system dependencies"
-pct exec "$CT_ID" -- bash -c '
-  set -e
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get update -qq
-  apt-get install -y -qq curl git ca-certificates nginx >/dev/null 2>&1
-'
+pct exec "$CT_ID" -- bash -c 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y -qq curl git ca-certificates nginx >/dev/null 2>&1'
 msg_ok "Dependencies installed"
 
-# ── 5. Install uv (manages Python 3.12 itself, no deadsnakes needed) ──────────
+# -- 5. Install uv (manages Python 3.12 itself, no deadsnakes needed) --
 msg_info "Installing uv"
-pct exec "$CT_ID" -- bash -c '
-  set -e
-  curl -fsSL https://astral.sh/uv/install.sh | sh
-'
+pct exec "$CT_ID" -- bash -c 'curl -fsSL https://astral.sh/uv/install.sh | sh'
 msg_ok "uv installed"
 
-# ── 6. Clone repo ────────────────────────────────────────────────────────────
+# -- 6. Clone repo --
 msg_info "Cloning Apotheca"
-pct exec "$CT_ID" -- bash -c "set -e; rm -rf ${INSTALL_DIR}; git clone -q ${REPO} ${INSTALL_DIR}"
+pct exec "$CT_ID" -- bash -c "rm -rf ${INSTALL_DIR}; git clone -q ${REPO} ${INSTALL_DIR}"
 msg_ok "Repository cloned"
 
-# ── 7. Setup API (uv installs Python 3.12 automatically) ─────────────────────
+# -- 7. Setup API (uv installs Python 3.12 automatically) --
 msg_info "Setting up API (uv will install Python 3.12)"
-pct exec "$CT_ID" -- bash -c '
-  set -e
-  export PATH="/root/.local/bin:$PATH"
-  cd '"${INSTALL_DIR}"'/apps/api
-  mkdir -p '"${DATA_DIR}"'
-  uv sync --no-dev
-  uv run alembic upgrade head || true
-'
+pct exec "$CT_ID" -- bash -c 'export PATH="/root/.local/bin:$PATH"; cd '"${INSTALL_DIR}"'/apps/api; mkdir -p '"${DATA_DIR}"'; uv sync --no-dev; uv run alembic upgrade head || true'
 msg_ok "API ready"
 
-# ── 8. Build web frontend ─────────────────────────────────────────────────────
+# -- 8. Build web frontend --
 msg_info "Building web frontend"
-pct exec "$CT_ID" -- bash -c '
-  set -e
-  export DEBIAN_FRONTEND=noninteractive
-  if ! command -v node &>/dev/null; then
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-    apt-get install -y -qq nodejs >/dev/null 2>&1
-  fi
-  corepack enable
-  corepack prepare pnpm@latest --activate
-  cd '"${INSTALL_DIR}"'
-  pnpm install --frozen-lockfile
-  pnpm --filter @apotheca/web build
-  mkdir -p /var/www/apotheca
-  cp -r apps/web/dist/* /var/www/apotheca/
-  cp -r apps/web/public/downloads /var/www/apotheca/downloads 2>/dev/null || true
-'
+pct exec "$CT_ID" -- bash -c 'export DEBIAN_FRONTEND=noninteractive; if ! command -v node >/dev/null 2>&1; then curl -fsSL https://deb.nodesource.com/setup_22.x | bash -; apt-get install -y -qq nodejs >/dev/null 2>&1; fi; corepack enable; corepack prepare pnpm@latest --activate; cd '"${INSTALL_DIR}"'; pnpm install --frozen-lockfile; pnpm --filter @apotheca/web build; mkdir -p /var/www/apotheca; cp -r apps/web/dist/* /var/www/apotheca/; cp -r apps/web/public/downloads /var/www/apotheca/downloads 2>/dev/null || true'
 msg_ok "Web frontend built"
 
-# ── 9. Configure nginx ────────────────────────────────────────────────────────
+# -- 9. Configure nginx (piped heredoc via_pct exec_stdin) --
 msg_info "Configuring nginx"
-pct exec "$CT_ID" -- bash -c "
-  set -e
-  cat > /etc/nginx/sites-available/apotheca <<'NGINX'
+pct exec "$CT_ID" -- bash -c 'cat > /etc/nginx/sites-available/apotheca' << 'NGINX'
 server {
     listen 80;
     server_name _;
@@ -202,7 +168,7 @@ server {
     index index.html;
 
     location / {
-        try_files \$uri \$uri/ /index.html;
+        try_files $uri $uri/ /index.html;
     }
 
     location /auth/      { proxy_pass http://127.0.0.1:8000; }
@@ -219,18 +185,12 @@ server {
     }
 }
 NGINX
-
-  ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca
-  rm -f /etc/nginx/sites-enabled/default
-  systemctl restart nginx
-"
+pct exec "$CT_ID" -- bash -c 'ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca; rm -f /etc/nginx/sites-enabled/default; systemctl restart nginx'
 msg_ok "nginx configured"
 
-# ── 10. Create systemd service ────────────────────────────────────────────────
+# -- 10. Create systemd service (piped heredoc via pct exec stdin) --
 msg_info "Creating systemd service"
-pct exec "$CT_ID" -- bash -c "
-  set -e
-  cat > /etc/systemd/system/apotheca-api.service <<'SYSTEMD'
+pct exec "$CT_ID" -- bash -c 'cat > /etc/systemd/system/apotheca-api.service' << SYSTEMD
 [Unit]
 Description=Apotheca API (FastAPI)
 After=network.target
@@ -247,14 +207,10 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 SYSTEMD
-
-  systemctl daemon-reload
-  systemctl enable -q apotheca-api
-  systemctl start apotheca-api
-"
+pct exec "$CT_ID" -- bash -c 'systemctl daemon-reload; systemctl enable -q apotheca-api; systemctl start apotheca-api'
 msg_ok "Service created and started"
 
-# ── 11. Health check ─────────────────────────────────────────────────────────
+# -- 11. Health check --
 msg_info "Waiting for API health check"
 for i in $(seq 1 30); do
   if pct exec "$CT_ID" -- bash -c "curl -sf http://localhost:8000/health" 2>/dev/null; then
@@ -266,7 +222,7 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-# ── Done ─────────────────────────────────────────────────────────────────────
+# -- Done --
 if [[ "$CT_IP" == "dhcp" ]]; then
   CT_IP=$(pct exec "$CT_ID" -- ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
 fi
