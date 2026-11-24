@@ -32,13 +32,14 @@ def _log_action(db: Session, user_id: str | None, action: str, entity: str, enti
     db.commit()
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == payload.email).first():
+    email = payload.email.lower().strip()
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
     user = User(
-        email=payload.email,
+        email=email,
         name=payload.name,
         password_hash=hash_password(payload.password),
         is_admin=False,
@@ -48,12 +49,16 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     db.refresh(user)
 
     _log_action(db, user.id, "register", "user", user.id, f"User {user.email} registered")
-    return user
+
+    access = create_access_token(user.id, extra={"email": user.email, "admin": user.is_admin})
+    refresh = create_refresh_token(user.id)
+    return TokenResponse(access_token=access, refresh_token=refresh)
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
+    email = payload.email.lower().strip()
+    user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 

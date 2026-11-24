@@ -4,21 +4,13 @@ import { IconSearch, IconPlus } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
 import { useAddMedication, useCimaSearch } from '../api/hooks'
 
-interface CimaResult {
-  nregistro: string
-  nombre: string
-  pactivos: string
-  labtitular: string
-  cpresc: string
-}
-
 export function SearchPage() {
   const [query, setQuery] = useState('')
   const [searchType, setSearchType] = useState<'name' | 'active'>('name')
-  const { data, isFetching } = useCimaSearch(query, searchType)
+  const { data: results, isFetching } = useCimaSearch(query, searchType)
   const addMedication = useAddMedication()
 
-  const results = (data as CimaResult[]) ?? []
+  const list = results ?? []
 
   const handleAdd = (nregistro: string) => {
     addMedication.mutate(nregistro, {
@@ -50,10 +42,10 @@ export function SearchPage() {
       />
       <Stack gap="xs">
         {isFetching && <Text c="dimmed">Buscando…</Text>}
-        {!isFetching && results.length === 0 && query.length >= 2 && (
+        {!isFetching && list.length === 0 && query.length >= 2 && (
           <Text c="dimmed">Sin resultados</Text>
         )}
-        {results.map((r) => (
+        {list.map((r) => (
           <Card key={r.nregistro} withBorder padding="sm">
             <Group justify="space-between" align="flex-start">
               <div style={{ flex: 1 }}>

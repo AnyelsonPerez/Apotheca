@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
 import type {
   AlertsResponse,
+  CimaSearchResult,
   InventoryItem,
   Lot,
   Medication,
@@ -34,9 +35,10 @@ export function useRegister() {
 export function useCimaSearch(query: string, type: 'name' | 'active') {
   return useQuery({
     queryKey: ['cima', type, query],
-    queryFn: () => {
-      const params = type === 'name' ? `nombre=${query}` : `pactivos=${query}`
-      return apiFetch<unknown[]>(`/cima/search?${params}`)
+    queryFn: async () => {
+      const params = type === 'name' ? `nombre=${encodeURIComponent(query)}` : `pactivos=${encodeURIComponent(query)}`
+      const data = await apiFetch<{ resultados: CimaSearchResult[] }>(`/cima/search?${params}`)
+      return data.resultados ?? []
     },
     enabled: query.length >= 2,
   })

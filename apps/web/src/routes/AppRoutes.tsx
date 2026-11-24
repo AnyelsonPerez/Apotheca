@@ -13,10 +13,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <MainLayout>{children}</MainLayout>
 }
 
+function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth()
+  if (isAuthenticated) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<AuthPage />} />
+      <Route path="/login" element={<PublicOnlyRoute><AuthPage /></PublicOnlyRoute>} />
       <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
       <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
