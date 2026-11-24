@@ -1,21 +1,27 @@
 import { useState } from 'react'
-import { Badge, Button, Card, Group, SegmentedControl, Stack, Text, TextInput } from '@mantine/core'
-import { IconSearch, IconPlus } from '@tabler/icons-react'
+import { Badge, Button, Card, Group, Modal, NumberInput, Stack, Text, TextInput } from '@mantine/core'
+import { IconSearch, IconPlus, IconCheck } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
-import { useAddMedication, useCimaSearch } from '../api/hooks'
+import { useAddMedication, useCimaSearch, useCreateLot } from '../api/hooks'
+import type { CimaSearchResult } from '../api/types'
 
 export function SearchPage() {
   const [query, setQuery] = useState('')
-  const [searchType, setSearchType] = useState<'name' | 'active'>('name')
-  const { data: results, isFetching } = useCimaSearch(query, searchType)
+  const { data, isFetching } = useCimaSearch(query)
   const addMedication = useAddMedication()
 
-  const list = results ?? []
+  // Lot modal state
+  const [lotModal, setLotModal] = useState<{ med: CimaSearchResult; medId: string } | null>(null)
+  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', dosage: '' })
+  const createLot = useCreateLot()
 
-  const handleAdd = (nregistro: string) => {
-    addMedication.mutate(nregistro, {
-      onSuccess: () => {
-        notifications.show({ message: 'Medicamento añadido al inventario', color: 'green' })
+  const handleAdd = (r: CimaSearchResult) => {
+    addMedication.mutate(r.nregistro, {
+      onSuccess: (med) => {
+        notifications.show({ message: 'Medicamento añadido', color: 'green' })
+        // Pre-fill dosage from CIMA data
+        setLotForm({ quantity: 0, daily_dose: '', dosage: r.dosis || '' })
+        setLotModal({ med: r, medId: med.id })
       },
       onError: (err) => {
         notifications.show({ message: String(err.message), color: 'red' })
@@ -23,56 +29,136 @@ export function SearchPage() {
     })
   }
 
+  const handleCreateLot = () => {
+    if (!lotModal) return
+    createLot.mutate(
+      {
+        medication_id: lotModal.medId,
+        quantity: lotForm.quantity,
+        daily_dose: lotForm.daily_dose ? Number(lotForm.daily_dose) : null,
+        dosage: lotForm.dosage || null,
+      },
+      {
+        onSuccess: () => {
+          notifications.show({ message: 'Lote añadido', color: 'green' })
+          setLotModal(null)
+        },
+        onError: (err) => notifications.show({ message: String(err.message), color: 'red' }),
+      },
+    )
+  }
+
+  const inventoryResults = data?.inventory ?? []
+  const cimaResults = data?.cima ?? []
+
+  const renderResult = (r: CimaSearchResult, fromInventory: boolean) => {
+    const alreadyInInventory = fromInventory || r.in_inventory
+    return (
+      <Card key={`${r.nregistro}-${fromInventory}`} withBorder padding="sm">
+        <Group justify="space-between" align="flex-start">
+          <div style={{ flex: 1 }}>
+            <Group gap="xs" align="center">
+              <Text fw={500} size="sm">{r.nombre}</Text>
+              {alreadyInInventory && (
+                <Badge size="xs" variant="light" color="teal" leftSection={<IconCheck size={10} />}>
+                  En inventario
+                </Badge>
+              )}
+              {r.cpresc && r.cpresc !== 'Sin Receta' && (
+                <Badge size="xs" variant="light" color="red">Con receta</Badge>
+              )}
+            </Group>
+            {r.pactivos && <Text size="xs" c="dimmed">{r.pactivos}</Text>}
+            <Group mt={4} gap="xs">
+              <Badge size="xs" variant="light">{r.nregistro}</Badge>
+              {r.labtitular && <Badge size="xs" variant="light" color="gray">{r.labtitular}</Badge>}
+              {r.dosis && <Badge size="xs" variant="light" color="blue">{r.dosis}</Badge>}
+            </Group>
+          </div>
+          <Button
+            size="xs"
+            variant={alreadyInInventory ? 'light' : 'filled'}
+            color="teal"
+            leftSection={<IconPlus size={14} />}
+            loading={addMedication.isPending}
+            onClick={() => handleAdd(r)}
+          >
+            {alreadyInInventory ? 'Añadir lote' : 'Añadir'}
+          </Button>
+        </Group>
+      </Card>
+    )
+  }
+
   return (
     <Stack>
       <Text fw={700} size="xl">Buscar medicamento</Text>
-      <SegmentedControl
-        value={searchType}
-        onChange={(v) => setSearchType(v as 'name' | 'active')}
-        data={[
-          { label: 'Por nombre', value: 'name' },
-          { label: 'Por principio activo', value: 'active' },
-        ]}
-      />
       <TextInput
-        placeholder="Escribe al menos 2 caracteres…"
+        placeholder="Busca por nombre o principio activo…"
         leftSection={<IconSearch size={16} />}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
       <Stack gap="xs">
         {isFetching && <Text c="dimmed">Buscando…</Text>}
-        {!isFetching && list.length === 0 && query.length >= 2 && (
+
+        {!isFetching && query.length >= 2 && inventoryResults.length === 0 && cimaResults.length === 0 && (
           <Text c="dimmed">Sin resultados</Text>
         )}
-        {list.map((r) => (
-          <Card key={r.nregistro} withBorder padding="sm">
-            <Group justify="space-between" align="flex-start">
-              <div style={{ flex: 1 }}>
-                <Text fw={500} size="sm">{r.nombre}</Text>
-                <Text size="xs" c="dimmed">{r.pactivos}</Text>
-                <Group mt={4} gap="xs">
-                  <Badge size="xs" variant="light">{r.nregistro}</Badge>
-                  {r.labtitular && <Badge size="xs" variant="light" color="gray">{r.labtitular}</Badge>}
-                  {r.cpresc && r.cpresc !== 'Sin Receta' && (
-                    <Badge size="xs" variant="light" color="red">Con receta</Badge>
-                  )}
-                </Group>
-              </div>
-              <Button
-                size="xs"
-                variant="light"
-                color="teal"
-                leftSection={<IconPlus size={14} />}
-                loading={addMedication.isPending}
-                onClick={() => handleAdd(r.nregistro)}
-              >
-                Añadir
-              </Button>
-            </Group>
-          </Card>
-        ))}
+
+        {inventoryResults.length > 0 && (
+          <>
+            <Text size="sm" fw={600} c="teal.7" mt="xs">En tu inventario</Text>
+            {inventoryResults.map((r) => renderResult(r, true))}
+          </>
+        )}
+
+        {cimaResults.length > 0 && (
+          <>
+            <Text size="sm" fw={600} c="dimmed" mt="xs">Resultados de CIMA ({data?.total_cima ?? cimaResults.length} total)</Text>
+            {cimaResults.map((r) => renderResult(r, false))}
+          </>
+        )}
       </Stack>
+
+      <Modal
+        opened={!!lotModal}
+        onClose={() => setLotModal(null)}
+        title={
+          <Group gap="xs">
+            <IconPlus size={18} color="#0CA678" />
+            <Text fw={600}>Añadir lote</Text>
+          </Group>
+        }
+      >
+        <Stack>
+          <Text size="sm" c="dimmed">{lotModal?.med.nombre}</Text>
+          {lotModal?.med.dosis && (
+            <Badge variant="light" color="blue" w="fit-content">{lotModal.med.dosis}</Badge>
+          )}
+          <NumberInput
+            label="Cantidad"
+            min={0}
+            value={lotForm.quantity}
+            onChange={(v) => setLotForm({ ...lotForm, quantity: Number(v) || 0 })}
+          />
+          <TextInput
+            label="Dosis diaria"
+            placeholder="2.5"
+            value={lotForm.daily_dose}
+            onChange={(e) => setLotForm({ ...lotForm, daily_dose: e.target.value })}
+          />
+          <TextInput
+            label="Posología"
+            placeholder="1 comprimido cada 8h"
+            value={lotForm.dosage}
+            onChange={(e) => setLotForm({ ...lotForm, dosage: e.target.value })}
+          />
+          <Button color="teal" loading={createLot.isPending} onClick={handleCreateLot}>
+            Guardar lote
+          </Button>
+        </Stack>
+      </Modal>
     </Stack>
   )
 }

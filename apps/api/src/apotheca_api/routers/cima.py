@@ -2,7 +2,7 @@ import json
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from apotheca_api.cima import get_cima_client
 from apotheca_api.database import get_db
@@ -17,6 +17,7 @@ async def search_medications(
     pactivos: str | None = Query(None, description="Buscar por principio activo"),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_db),
 ):
     if not nombre and not pactivos:
         raise HTTPException(
@@ -24,6 +25,34 @@ async def search_medications(
             detail="Debe indicar 'nombre' o 'pactivos'",
         )
 
+    query_term = nombre or pactivos
+
+    # Search local inventory by name, national_code, or active ingredient
+    local_meds = (
+        db.query(Medication)
+        .outerjoin(Medication.active_ingredient)
+        .filter(
+            (Medication.name.ilike(f"%{query_term}%"))
+            | (Medication.national_code.ilike(f"%{query_term}%"))
+            | (Medication.active_ingredient.has(Medication.active_ingredient.property.mapper.class_.name.ilike(f"%{query_term}%")))
+        )
+        .options(selectinload(Medication.active_ingredient))
+        .all()
+    )
+    local_results = [
+        {
+            "nregistro": m.national_code,
+            "nombre": m.name,
+            "pactivos": m.active_ingredient.name if m.active_ingredient else None,
+            "labtitular": m.laboratory,
+            "dosis": m.dosage,
+            "in_inventory": True,
+            "medication_id": m.id,
+        }
+        for m in local_meds
+    ]
+
+    # Search CIMA
     client = get_cima_client()
     try:
         if nombre:
@@ -36,8 +65,9 @@ async def search_medications(
             detail=f"Error consultando CIMA: {exc}",
         )
 
+    local_nregistros = {r["nregistro"] for r in local_results}
     resultados = data.get("resultados", []) or []
-    items = [
+    cima_results = [
         {
             "nregistro": m.get("nregistro"),
             "nombre": m.get("nombre"),
@@ -46,12 +76,15 @@ async def search_medications(
             "cpresc": m.get("cpresc"),
             "comerc": m.get("comerc"),
             "dosis": m.get("dosis"),
+            "in_inventory": m.get("nregistro") in local_nregistros,
         }
         for m in resultados
     ]
+
     return {
-        "resultados": items,
-        "total": data.get("totalResultados"),
+        "inventory": local_results,
+        "cima": cima_results,
+        "total_cima": data.get("totalResultados"),
         "page": data.get("pagina"),
         "page_size": data.get("tamPagina"),
     }

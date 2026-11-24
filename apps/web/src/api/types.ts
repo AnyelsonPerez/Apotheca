@@ -78,4 +78,14 @@ export interface CimaSearchResult {
   labtitular: string
   dosis: string
   cpresc: string
+  in_inventory?: boolean
+  medication_id?: string
+}
+
+export interface CimaSearchResponse {
+  inventory: CimaSearchResult[]
+  cima: CimaSearchResult[]
+  total_cima: number | null
+  page: number | null
+  page_size: number | null
 }
