@@ -11,6 +11,7 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "dev.apotheca.app",
       "adaptiveIcon": {
         "backgroundColor": "#0CA678",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

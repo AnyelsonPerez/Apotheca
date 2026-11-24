@@ -1,3 +1,5 @@
 packages:
   - "apps/*"
   - "packages/*"
+patchedDependencies:
+  react-native-vision-camera@5.2.4: patches/react-native-vision-camera@5.2.4.patch
