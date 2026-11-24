@@ -5,7 +5,6 @@ import { Button, Card, Container, PasswordInput, Stack, TextInput, Title, Text, 
 import { notifications } from '@mantine/notifications'
 import { useState } from 'react'
 import { useLogin, useRegister } from '../api/hooks'
-import { setTokens } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
 
 const loginSchema = z.object({
@@ -32,8 +31,7 @@ export function AuthPage() {
   const onLogin = (data: LoginForm) => {
     loginMutation.mutate(data, {
       onSuccess: (tokens) => {
-        setTokens(tokens.access_token, tokens.refresh_token)
-        login({ id: '', email: data.email, name: '', is_admin: false })
+        login({ id: '', email: data.email, name: '', is_admin: false }, tokens)
         notifications.show({ message: 'Bienvenido', color: 'green' })
       },
       onError: (err) => {
@@ -45,8 +43,7 @@ export function AuthPage() {
   const onRegister = (data: RegisterForm) => {
     registerMutation.mutate(data, {
       onSuccess: (tokens) => {
-        setTokens(tokens.access_token, tokens.refresh_token)
-        login({ id: '', email: data.email, name: data.name, is_admin: false })
+        login({ id: '', email: data.email, name: data.name, is_admin: false }, tokens)
         notifications.show({ message: 'Cuenta creada', color: 'green' })
       },
       onError: (err) => {

@@ -14,9 +14,7 @@ DEFAULT_SETTINGS = {
 def seed_settings(db: Session) -> None:
     for key, value in DEFAULT_SETTINGS.items():
         existing = db.query(Settings).filter(Settings.key == key).first()
-        if existing:
-            existing.value = value
-        else:
+        if not existing:
             db.add(Settings(key=key, value=value))
     db.commit()
 

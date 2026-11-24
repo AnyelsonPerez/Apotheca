@@ -1,7 +1,7 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from apotheca_api.config import settings
@@ -43,17 +43,17 @@ async def get_alerts(db: Session = Depends(get_db)):
     depletion_threshold_days = int(_get_setting(db, "depletion_threshold_days", "7"))
 
     now = datetime.now(timezone.utc)
-    expiry_threshold = now + timedelta(days=expiry_warning_days)
 
-    lots = db.query(Lot).all()
+    lots = (
+        db.query(Lot)
+        .join(Medication, Lot.medication_id == Medication.id)
+        .add_columns(Medication.name, Medication.national_code)
+        .all()
+    )
     expiry_alerts: list[AlertItem] = []
     depletion_alerts: list[AlertItem] = []
 
-    for lot in lots:
-        med = db.query(Medication).filter(Medication.id == lot.medication_id).first()
-        if not med:
-            continue
-
+    for lot, med_name, med_code in lots:
         if lot.expiry_date:
             expiry_aware = lot.expiry_date.replace(tzinfo=timezone.utc) if lot.expiry_date.tzinfo is None else lot.expiry_date
             days_until = (expiry_aware - now).days
@@ -61,8 +61,8 @@ async def get_alerts(db: Session = Depends(get_db)):
                 expiry_alerts.append(
                     AlertItem(
                         lot_id=lot.id,
-                        medication_name=med.name,
-                        national_code=med.national_code,
+                        medication_name=med_name,
+                        national_code=med_code,
                         quantity=lot.quantity,
                         expiry_date=lot.expiry_date,
                         days_until_expiry=days_until,
@@ -70,19 +70,36 @@ async def get_alerts(db: Session = Depends(get_db)):
                     )
                 )
 
+                if days_until <= 0:
+                    med = db.query(Medication).filter(Medication.id == lot.medication_id).first()
+                    if med:
+                        await _send_ntfy_notification(
+                            db, lot, med,
+                            f" caducado: {med_name} (lote {lot.id[:8]})",
+                            "expiry",
+                        )
+
         if lot.daily_dose and lot.daily_dose > 0 and lot.quantity > 0:
             days_left = lot.quantity / lot.daily_dose
             if days_left <= depletion_threshold_days:
                 depletion_alerts.append(
                     AlertItem(
                         lot_id=lot.id,
-                        medication_name=med.name,
-                        national_code=med.national_code,
+                        medication_name=med_name,
+                        national_code=med_code,
                         quantity=lot.quantity,
                         daily_dose=lot.daily_dose,
                         days_until_depleted=round(days_left, 1),
                         alert_type="depletion",
                     )
                 )
+
+                med = db.query(Medication).filter(Medication.id == lot.medication_id).first()
+                if med and days_left <= 2:
+                    await _send_ntfy_notification(
+                        db, lot, med,
+                        f" agotándose: {med_name} — {round(days_left, 1)} días restantes",
+                        "depletion",
+                    )
 
     return AlertsResponse(expiry=expiry_alerts, depletion=depletion_alerts)

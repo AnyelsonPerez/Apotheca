@@ -41,6 +41,7 @@ async def search_medications(
         {
             "nregistro": m.get("nregistro"),
             "nombre": m.get("nombre"),
+            "pactivos": m.get("pactivos"),
             "labtitular": m.get("labtitular"),
             "cpresc": m.get("cpresc"),
             "comerc": m.get("comerc"),
