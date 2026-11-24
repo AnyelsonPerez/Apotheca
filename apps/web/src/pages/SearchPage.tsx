@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Badge, Button, Card, DateInput, Group, Modal, NumberInput, Stack, Text, TextInput } from '@mantine/core'
+import { Badge, Button, Card, Group, Modal, NumberInput, Stack, Text, TextInput } from '@mantine/core'
+import { DateInput } from '@mantine/dates'
 import { IconSearch, IconPlus, IconCheck } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
 import { useAddMedication, useCimaSearch, useCreateLot } from '../api/hooks'
