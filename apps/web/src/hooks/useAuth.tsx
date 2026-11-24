@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import { clearTokens, getAccessToken, setTokens as persistTokens } from '../api/client'
 import type { TokenResponse, User } from '../api/types'
 
@@ -19,6 +19,16 @@ const AuthContext = createContext<AuthContextValue>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(!!getAccessToken())
   const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    const onUnauthorized = () => {
+      clearTokens()
+      setUser(null)
+      setIsAuthenticated(false)
+    }
+    window.addEventListener('apotheca:unauthorized', onUnauthorized)
+    return () => window.removeEventListener('apotheca:unauthorized', onUnauthorized)
+  }, [])
 
   const login = (user: User, tokens: TokenResponse) => {
     persistTokens(tokens.access_token, tokens.refresh_token)

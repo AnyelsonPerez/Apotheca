@@ -7,18 +7,28 @@ import {
   Group,
   Modal,
   NumberInput,
+  Select,
   Stack,
   Table,
   Text,
   TextInput,
 } from '@mantine/core'
 import { IconPlus, IconTrash } from '@tabler/icons-react'
+import { useSearchParams } from 'react-router-dom'
 import { notifications } from '@mantine/notifications'
-import { useCreateLot, useDeleteLot, useDeleteMedication, useInventory } from '../api/hooks'
+import { useAlerts, useCreateLot, useDeleteLot, useDeleteMedication, useInventory } from '../api/hooks'
 import type { InventoryItem } from '../api/types'
 
+type FilterType = 'all' | 'expiry' | 'depletion'
+
 export function InventoryPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filter: FilterType = searchParams.get('filter') === 'expiry' || searchParams.get('filter') === 'depletion'
+    ? searchParams.get('filter') as FilterType
+    : 'all'
+  const setFilter = (f: FilterType) => setSearchParams(f === 'all' ? {} : { filter: f })
   const { data: inventory, isLoading } = useInventory()
+  const { data: alerts } = useAlerts()
   const deleteMed = useDeleteMedication()
   const deleteLot = useDeleteLot()
   const createLot = useCreateLot()
@@ -65,7 +75,15 @@ export function InventoryPage() {
 
   if (isLoading) return <Text c="dimmed">Cargando…</Text>
 
-  const rows = inventory?.flatMap((med) => {
+  const alertedLotIds = filter === 'all'
+    ? new Set<string>()
+    : new Set((filter === 'expiry' ? alerts?.expiry : alerts?.depletion)?.map((a) => a.lot_id) ?? [])
+
+  const visibleInventory = (inventory ?? []).filter((med) =>
+    filter === 'all' ? true : med.lots.some((lot) => alertedLotIds.has(lot.id)),
+  )
+
+  const rows = visibleInventory.flatMap((med) => {
     const rows = [
       <Table.Tr key={med.id}>
         <Table.Td>
@@ -91,30 +109,53 @@ export function InventoryPage() {
         </Table.Td>
       </Table.Tr>,
     ]
-    med.lots.forEach((lot) => {
-      rows.push(
-        <Table.Tr key={lot.id} bg="gray.0">
-          <Table.Td pl="xl">
-            <Text size="xs" c="dimmed">Lote: {lot.id.slice(0, 8)}</Text>
-            {lot.dosage && <Text size="xs" c="dimmed">{lot.dosage}</Text>}
-          </Table.Td>
-          <Table.Td></Table.Td>
-          <Table.Td><Badge size="xs" variant="light">{lot.quantity}</Badge></Table.Td>
-          <Table.Td>{lot.daily_dose ? `${lot.daily_dose}/día` : '—'}</Table.Td>
-          <Table.Td>
-            <ActionIcon variant="subtle" color="red" size="sm" onClick={() => handleDeleteLot(lot.id)}>
-              <IconTrash size={14} />
-            </ActionIcon>
-          </Table.Td>
-        </Table.Tr>,
-      )
-    })
+    med.lots
+      .filter((lot) => filter === 'all' || alertedLotIds.has(lot.id))
+      .forEach((lot) => {
+        const alerted = filter !== 'all' && alertedLotIds.has(lot.id)
+        rows.push(
+          <Table.Tr key={lot.id} bg={alerted ? 'orange.0' : 'gray.0'}>
+            <Table.Td pl="xl">
+              <Group gap="xs">
+                <Text size="xs" c="dimmed">Lote: {lot.id.slice(0, 8)}</Text>
+                {alerted && (
+                  <Badge size="xs" variant="light" color={filter === 'expiry' ? 'orange' : 'red'}>
+                    {filter === 'expiry' ? 'Caducidad' : 'Agotamiento'}
+                  </Badge>
+                )}
+              </Group>
+              {lot.dosage && <Text size="xs" c="dimmed">{lot.dosage}</Text>}
+            </Table.Td>
+            <Table.Td></Table.Td>
+            <Table.Td><Badge size="xs" variant="light">{lot.quantity}</Badge></Table.Td>
+            <Table.Td>{lot.daily_dose ? `${lot.daily_dose}/día` : '—'}</Table.Td>
+            <Table.Td>
+              <ActionIcon variant="subtle" color="red" size="sm" onClick={() => handleDeleteLot(lot.id)}>
+                <IconTrash size={14} />
+              </ActionIcon>
+            </Table.Td>
+          </Table.Tr>,
+        )
+      })
     return rows
   })
 
   return (
     <Stack>
-      <Text fw={700} size="xl">Inventario</Text>
+      <Group justify="space-between">
+        <Text fw={700} size="xl">Inventario</Text>
+        <Select
+          size="xs"
+          w={220}
+          value={filter === 'all' ? 'all' : filter}
+          onChange={(v) => setFilter((v as FilterType) ?? 'all')}
+          data={[
+            { value: 'all', label: 'Todos los lotes' },
+            { value: 'expiry', label: `Alertas de caducidad (${alerts?.expiry.length ?? 0})` },
+            { value: 'depletion', label: `Alertas de agotamiento (${alerts?.depletion.length ?? 0})` },
+          ]}
+        />
+      </Group>
       <Box style={{ overflowX: 'auto' }}>
         <Table striped highlightOnHover>
           <Table.Thead>
@@ -129,7 +170,11 @@ export function InventoryPage() {
           <Table.Tbody>{rows}</Table.Tbody>
         </Table>
       </Box>
-      {inventory?.length === 0 && <Text c="dimmed" ta="center">Sin medicamentos. Usa la búsqueda para añadir.</Text>}
+      {visibleInventory.length === 0 && (
+        <Text c="dimmed" ta="center">
+          {filter === 'all' ? 'Sin medicamentos. Usa la búsqueda para añadir.' : 'Ningún lote con esta alerta.'}
+        </Text>
+      )}
 
       <Modal opened={!!modalMed} onClose={() => setModalMed(null)} title={`Añadir lote — ${modalMed?.name ?? ''}`}>
         <Stack>

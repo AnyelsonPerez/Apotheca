@@ -1,10 +1,12 @@
 import { Alert, Card, Grid, Group, SimpleGrid, Text, ThemeIcon } from '@mantine/core'
 import { IconAlertTriangle, IconBell, IconPill, IconCalendarClock } from '@tabler/icons-react'
+import { useNavigate } from 'react-router-dom'
 import { useAlerts, useInventory } from '../api/hooks'
 
 export function DashboardPage() {
   const { data: inventory } = useInventory()
   const { data: alerts } = useAlerts()
+  const navigate = useNavigate()
 
   const totalMeds = inventory?.length ?? 0
   const totalUnits = inventory?.reduce((sum, m) => sum + m.total_quantity, 0) ?? 0
@@ -12,10 +14,10 @@ export function DashboardPage() {
   const depletionCount = alerts?.depletion.length ?? 0
 
   const stats = [
-    { label: 'Medicamentos', value: totalMeds, icon: IconPill, color: 'teal' },
-    { label: 'Unidades totales', value: totalUnits, icon: IconPill, color: 'blue' },
-    { label: 'Alertas caducidad', value: expiryCount, icon: IconCalendarClock, color: 'orange' },
-    { label: 'Alertas agotamiento', value: depletionCount, icon: IconAlertTriangle, color: 'red' },
+    { label: 'Medicamentos', value: totalMeds, icon: IconPill, color: 'teal', target: '/inventory' },
+    { label: 'Unidades totales', value: totalUnits, icon: IconPill, color: 'blue', target: '/inventory' },
+    { label: 'Alertas caducidad', value: expiryCount, icon: IconCalendarClock, color: 'orange', target: '/inventory?filter=expiry' },
+    { label: 'Alertas agotamiento', value: depletionCount, icon: IconAlertTriangle, color: 'red', target: '/inventory?filter=depletion' },
   ]
 
   return (
@@ -25,7 +27,16 @@ export function DashboardPage() {
         {stats.map((s) => {
           const Icon = s.icon
           return (
-            <Card key={s.label} withBorder shadow="sm" padding="lg">
+            <Card
+              key={s.label}
+              withBorder
+              shadow="sm"
+              padding="lg"
+              style={{ cursor: 'pointer', transition: 'box-shadow 0.15s ease' }}
+              onClick={() => navigate(s.target)}
+              onMouseEnter={(e) => (e.currentTarget.style.boxShadow = 'var(--mantine-box-shadow-md)')}
+              onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'var(--mantine-box-shadow-xs)')}
+            >
               <Group justify="space-between">
                 <div>
                   <Text size="xs" c="dimmed" tt="uppercase" fw={600}>{s.label}</Text>
@@ -44,14 +55,28 @@ export function DashboardPage() {
         <Grid>
           {expiryCount > 0 && (
             <Grid.Col span={{ base: 12, md: 6 }}>
-              <Alert icon={<IconCalendarClock size={16} />} title="Caducidades próximas" color="orange" variant="light">
+              <Alert
+                icon={<IconCalendarClock size={16} />}
+                title="Caducidades próximas"
+                color="orange"
+                variant="light"
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate('/inventory?filter=expiry')}
+              >
                 Hay {expiryCount} lote(s) próximo(s) a caducar.
               </Alert>
             </Grid.Col>
           )}
           {depletionCount > 0 && (
             <Grid.Col span={{ base: 12, md: 6 }}>
-              <Alert icon={<IconAlertTriangle size={16} />} title="Agotamiento próximo" color="red" variant="light">
+              <Alert
+                icon={<IconAlertTriangle size={16} />}
+                title="Agotamiento próximo"
+                color="red"
+                variant="light"
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate('/inventory?filter=depletion')}
+              >
                 Hay {depletionCount} lote(s) próximo(s) a agotarse.
               </Alert>
             </Grid.Col>

@@ -64,6 +64,8 @@ export async function apiFetch<T>(
     if (newToken) {
       headers['Authorization'] = `Bearer ${newToken}`
       res = await fetch(`${API_URL}${path}`, { ...options, headers })
+    } else {
+      window.dispatchEvent(new CustomEvent('apotheca:unauthorized'))
     }
   }
 
