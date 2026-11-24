@@ -9,8 +9,12 @@
 set -euo pipefail
 
 # ── Colors ────────────────────────────────────────────────────────────────────
-YW=$(printf "\033[33m"); RD=$(printf "\033[01;31m"); GN=$(printf "\033[1;92m")
-CL=$(printf "\033[m"); BGN=$(printf "\033[4;92m"); BL=$(printf "\033[36m")
+YW=$(printf "\033[33m")
+RD=$(printf "\033[01;31m")
+GN=$(printf "\033[1;92m")
+CL=$(printf "\033[m")
+BGN=$(printf "\033[4;92m")
+BL=$(printf "\033[36m")
 
 APP="Apotheca"
 REPO="https://github.com/AnyelsonPerez/Apotheca.git"
@@ -20,16 +24,16 @@ DATA_DIR="/var/lib/apotheca"
 # ── Header ────────────────────────────────────────────────────────────────────
 header_info() {
   clear
-  cat <<EOF
-${BL}
-    ___                    __     __                       
+  cat << 'BANNER'
+
+    ___                    __     __
    /   |    ____   ____   / /_   / /_   ___   _____  ____ _
-  / /| |   / __ \ / __ \ / __/  / __ \ / _ \ / ___/ / __ `/
- / ___ |  / /_/ // /_/ // /_   / / / //  __// /__  / /_/ / 
-/_/  |_| / .___/ \____/ \__/  /_/ /_/ \___/ \___/  \__,_/  
-        /_/       Self-hosted pharmacy
-${CL}
-EOF
+  / /| |   / __ \ / __ \ / __/  / __ \ / _ \ / ___/ / __  /
+ / ___ |  / /_/ // /_/ // /_   / / / //  __// /__  / /_/ /
+/_/  |_| / .___/ \____/ \__/  /_/ /_/ \___/ \___/  \__,_/
+        /_/
+      Self-hosted pharmacy management
+BANNER
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -39,12 +43,12 @@ msg_error(){ echo -e " ${RD}[ERROR]${CL} ${1}"; exit 1; }
 
 # ── Detect defaults ───────────────────────────────────────────────────────────
 DEFAULT_CT_ID=$(pvesh get /cluster/nextid 2>/dev/null | tr -d '"' || echo "200")
-DEFAULT_GW=$(ip route | awk "/default/ {print \$3; exit}")
+DEFAULT_GW=$(ip route | awk '/default/ {print $3; exit}')
 
 # Detect the first bridge on the host (vmbr0 usually)
 detect_bridge() {
   local br
-  br=$(ip -o link show type bridge | awk -F": " "{print \$2}" | head -1)
+  br=$(ip -o link show type bridge | awk -F': ' '{print $2}' | head -1)
   echo "${br:-vmbr0}"
 }
 BRIDGE=$(detect_bridge)
@@ -52,7 +56,7 @@ BRIDGE=$(detect_bridge)
 # Detect rootfs storage: first storage with rootdir content
 detect_storage() {
   local stor
-  stor=$(pvesm status -content rootdir 2>/dev/null | awk "NR>1{print \$1}" | head -1)
+  stor=$(pvesm status -content rootdir 2>/dev/null | awk 'NR>1{print $1}' | head -1)
   echo "${stor:-local}"
 }
 STORAGE=$(detect_storage)
@@ -60,7 +64,7 @@ STORAGE=$(detect_storage)
 # Detect vztmpl storage
 detect_template_storage() {
   local stor
-  stor=$(pvesm status -content vztmpl 2>/dev/null | awk "NR>1{print \$1}" | head -1)
+  stor=$(pvesm status -content vztmpl 2>/dev/null | awk 'NR>1{print $1}' | head -1)
   echo "${stor:-local}"
 }
 TEMPLATE_STORAGE=$(detect_template_storage)
@@ -70,21 +74,21 @@ echo -e "${GN}Welcome to the ${APP} LXC installer!${CL}"
 echo ""
 
 # ── Interactive prompts ───────────────────────────────────────────────────────
-read -rp "$(echo -e ${BL}"Container ID [${DEFAULT_CT_ID}]: "${CL})" CT_ID
+read -rp "$(echo -e "${BL}Container ID [${DEFAULT_CT_ID}]: ${CL}")" CT_ID
 CT_ID="${CT_ID:-$DEFAULT_CT_ID}"
 
-read -rp "$(echo -e ${BL}"IP address (CIDR, e.g. 10.10.0.220/24) or DHCP: "${CL})" CT_IP
+read -rp "$(echo -e "${BL}IP address (CIDR, e.g. 10.10.0.220/24) or DHCP: ${CL}")" CT_IP
 if [[ -z "$CT_IP" || "${CT_IP,,}" == "dhcp" ]]; then
   CT_IP="dhcp"
   NET_CONFIG="name=eth0,bridge=${BRIDGE},ip=dhcp"
   msg_info "Using DHCP on bridge ${BRIDGE}"
 else
-  read -rp "$(echo -e ${BL}"Gateway [${DEFAULT_GW}]: "${CL})" CT_GW
+  read -rp "$(echo -e "${BL}Gateway [${DEFAULT_GW}]: ${CL}")" CT_GW
   CT_GW="${CT_GW:-$DEFAULT_GW}"
   NET_CONFIG="name=eth0,bridge=${BRIDGE},ip=${CT_IP},gw=${CT_GW}"
 fi
 
-read -rp "$(echo -e ${BL}"Disk size (GB) [8]: "${CL})" CT_DISK
+read -rp "$(echo -e "${BL}Disk size (GB) [8]: ${CL}")" CT_DISK
 CT_DISK="${CT_DISK:-8}"
 
 echo ""
@@ -97,7 +101,7 @@ echo -e "  Storage:     ${STORAGE}"
 echo -e "  Install dir: ${INSTALL_DIR}"
 echo -e "  Data dir:    ${DATA_DIR}"
 echo ""
-read -rp "$(echo -e ${YW}"Press Enter to continue, Ctrl+C to abort..."${CL})"
+read -rp "$(echo -e "${YW}Press Enter to continue, Ctrl+C to abort...${CL}")"
 
 # ── 1. Download template ──────────────────────────────────────────────────────
 msg_info "Updating LXC template cache"
@@ -130,7 +134,7 @@ pct start "$CT_ID"
 sleep 5
 msg_ok "Container started"
 
-# ── 4. Install dependencies ─────────────────────────────────────────────────
+# ── 4. Install system dependencies ───────────────────────────────────────────
 msg_info "Installing system dependencies"
 pct exec "$CT_ID" -- bash -c '
   set -e
@@ -140,77 +144,45 @@ pct exec "$CT_ID" -- bash -c '
 '
 msg_ok "Dependencies installed"
 
-# ── 5. Install Python + uv ───────────────────────────────────────────────────
-msg_info "Installing Python 3.12 and uv"
+# ── 5. Install uv (manages Python 3.12 itself, no deadsnakes needed) ──────────
+msg_info "Installing uv"
 pct exec "$CT_ID" -- bash -c '
   set -e
-  export DEBIAN_FRONTEND=noninteractive
-
-  # Install Python 3.12 from deadsnakes if not available in base
-  apt-get install -y -qq python3 python3-pip python3-venv >/dev/null 2>&1
-
-  # Check if python3.12 is available, otherwise add deadsnakes PPA
-  if ! command -v python3.12 &>/dev/null; then
-    apt-get install -y -qq software-properties-common >/dev/null 2>&1
-    add-apt-repository -y ppa:deadsnakes/ppa
-    apt-get update -qq
-    apt-get install -y -qq python3.12 python3.12-venv python3.12-dev >/dev/null 2>&1
-  fi
-
-  # Install uv
   curl -fsSL https://astral.sh/uv/install.sh | sh
 '
-msg_ok "Python and uv installed"
+msg_ok "uv installed"
 
 # ── 6. Clone repo ────────────────────────────────────────────────────────────
 msg_info "Cloning Apotheca"
-pct exec "$CT_ID" -- bash -c "
-  set -e
-  rm -rf ${INSTALL_DIR}
-  git clone -q ${REPO} ${INSTALL_DIR}
-"
+pct exec "$CT_ID" -- bash -c "set -e; rm -rf ${INSTALL_DIR}; git clone -q ${REPO} ${INSTALL_DIR}"
 msg_ok "Repository cloned"
 
-# ── 7. Setup API ─────────────────────────────────────────────────────────────
-msg_info "Setting up API"
+# ── 7. Setup API (uv installs Python 3.12 automatically) ─────────────────────
+msg_info "Setting up API (uv will install Python 3.12)"
 pct exec "$CT_ID" -- bash -c '
   set -e
-  export PATH="$HOME/.local/bin:$PATH"
+  export PATH="/root/.local/bin:$PATH"
   cd '"${INSTALL_DIR}"'/apps/api
-
-  # Create data directory
   mkdir -p '"${DATA_DIR}"'
-
-  # Install Python dependencies with uv
   uv sync --no-dev
-
-  # Run migrations
   uv run alembic upgrade head || true
 '
 msg_ok "API ready"
 
-# ── 8. Build web ──────────────────────────────────────────────────────────────
+# ── 8. Build web frontend ─────────────────────────────────────────────────────
 msg_info "Building web frontend"
 pct exec "$CT_ID" -- bash -c '
   set -e
   export DEBIAN_FRONTEND=noninteractive
-
-  # Install Node.js 22
   if ! command -v node &>/dev/null; then
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
     apt-get install -y -qq nodejs >/dev/null 2>&1
   fi
-
-  # Install pnpm
   corepack enable
   corepack prepare pnpm@latest --activate
-
-  # Build web
   cd '"${INSTALL_DIR}"'
   pnpm install --frozen-lockfile
   pnpm --filter @apotheca/web build
-
-  # Copy build to nginx
   mkdir -p /var/www/apotheca
   cp -r apps/web/dist/* /var/www/apotheca/
   cp -r apps/web/public/downloads /var/www/apotheca/downloads 2>/dev/null || true
@@ -219,9 +191,9 @@ msg_ok "Web frontend built"
 
 # ── 9. Configure nginx ────────────────────────────────────────────────────────
 msg_info "Configuring nginx"
-pct exec "$CT_ID" -- bash -c '
+pct exec "$CT_ID" -- bash -c "
   set -e
-  cat <<NGINX > /etc/nginx/sites-available/apotheca
+  cat > /etc/nginx/sites-available/apotheca <<'NGINX'
 server {
     listen 80;
     server_name _;
@@ -230,7 +202,7 @@ server {
     index index.html;
 
     location / {
-        try_files $uri $uri/ /index.html;
+        try_files \$uri \$uri/ /index.html;
     }
 
     location /auth/      { proxy_pass http://127.0.0.1:8000; }
@@ -251,24 +223,22 @@ NGINX
   ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca
   rm -f /etc/nginx/sites-enabled/default
   systemctl restart nginx
-'
+"
 msg_ok "nginx configured"
 
-# ── 10. Create systemd services ──────────────────────────────────────────────
-msg_info "Creating systemd services"
-pct exec "$CT_ID" -- bash -c '
+# ── 10. Create systemd service ────────────────────────────────────────────────
+msg_info "Creating systemd service"
+pct exec "$CT_ID" -- bash -c "
   set -e
-
-  # API service
-  cat <<SYSTEMD > /etc/systemd/system/apotheca-api.service
+  cat > /etc/systemd/system/apotheca-api.service <<'SYSTEMD'
 [Unit]
 Description=Apotheca API (FastAPI)
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory='"${INSTALL_DIR}"'/apps/api
-Environment=APOTHECA_DATABASE_PATH='"${DATA_DIR}"'/apotheca.db
+WorkingDirectory=${INSTALL_DIR}/apps/api
+Environment=APOTHECA_DATABASE_PATH=${DATA_DIR}/apotheca.db
 Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/root/.local/bin/uv run uvicorn apotheca_api.app:app --host 127.0.0.1 --port 8000
 Restart=always
@@ -281,8 +251,8 @@ SYSTEMD
   systemctl daemon-reload
   systemctl enable -q apotheca-api
   systemctl start apotheca-api
-'
-msg_ok "Services created and started"
+"
+msg_ok "Service created and started"
 
 # ── 11. Health check ─────────────────────────────────────────────────────────
 msg_info "Waiting for API health check"
@@ -298,7 +268,7 @@ done
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 if [[ "$CT_IP" == "dhcp" ]]; then
-  CT_IP=$(pct exec "$CT_ID" -- ip -4 addr show eth0 | grep -oP "(?<=inet\s)\d+(\.\d+){3}")
+  CT_IP=$(pct exec "$CT_ID" -- ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
 fi
 
 echo ""
@@ -312,7 +282,12 @@ echo -e "  ${BL}Container:${CL}  pct enter ${CT_ID}"
 echo -e "  ${BL}App dir:${CL}    ${INSTALL_DIR}"
 echo -e "  ${BL}Data dir:${CL}   ${DATA_DIR}"
 echo ""
-echo -e "  ${BL}Update:${CL}     pct enter ${CT_ID} && cd ${INSTALL_DIR} && git pull && cd apps/api && uv sync && cd ../.. && pnpm --filter @apotheca/web build && cp -r apps/web/dist/* /var/www/apotheca/ && systemctl restart apotheca-api"
+echo -e "  ${BL}Update:${CL}     pct enter ${CT_ID}"
+echo -e "                  cd ${INSTALL_DIR} && git pull"
+echo -e "                  cd apps/api && uv sync"
+echo -e "                  cd /opt/apotheca && pnpm --filter @apotheca/web build"
+echo -e "                  cp -r apps/web/dist/* /var/www/apotheca/"
+echo -e "                  systemctl restart apotheca-api"
 echo ""
 echo -e "${YW}Next: Open the Web UI and register your first user.${CL}"
 echo -e "${YW}Then visit /app to download the Android APK.${CL}"
