@@ -31,11 +31,16 @@ export function AuthPage() {
   const onLogin = (data: LoginForm) => {
     loginMutation.mutate(data, {
       onSuccess: (tokens) => {
-        login({ id: '', email: data.email, name: '', is_admin: false }, tokens)
+        login({ id: '', email: data.email.toLowerCase(), name: '', is_admin: false }, tokens)
         notifications.show({ message: 'Bienvenido', color: 'green' })
       },
       onError: (err) => {
-        notifications.show({ message: String(err.message), color: 'red' })
+        const msg = String(err.message)
+        if (msg.includes('Invalid email or password') || msg.includes('401')) {
+          notifications.show({ message: 'Email o contraseña incorrectos. Si no tienes cuenta, regístrate.', color: 'red' })
+        } else {
+          notifications.show({ message: msg, color: 'red' })
+        }
       },
     })
   }

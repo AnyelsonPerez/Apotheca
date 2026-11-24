@@ -43,20 +43,23 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 }
 
+const PUBLIC_PATHS = ['/auth/login', '/auth/register', '/auth/password-reset', '/auth/password-reset/confirm']
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const isPublic = PUBLIC_PATHS.some((p) => path.startsWith(p))
   const token = getAccessToken()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...options.headers as Record<string, string>,
   }
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  if (token && !isPublic) headers['Authorization'] = `Bearer ${token}`
 
   let res = await fetch(`${API_URL}${path}`, { ...options, headers })
 
-  if (res.status === 401) {
+  if (res.status === 401 && !isPublic) {
     const newToken = await refreshAccessToken()
     if (newToken) {
       headers['Authorization'] = `Bearer ${newToken}`
