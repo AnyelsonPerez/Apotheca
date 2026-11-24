@@ -42,7 +42,7 @@ export function InventoryPage() {
   const updateLot = useUpdateLot()
   const [modalMed, setModalMed] = useState<InventoryItem | null>(null)
   const [editingLot, setEditingLot] = useState<Lot | null>(null)
-  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', expiry_date: null as Date | null })
+  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', expiry_date: null as string | Date | null })
 
   const openLotModal = (med: InventoryItem) => {
     setModalMed(med)
@@ -70,7 +70,7 @@ export function InventoryPage() {
     const lotData = {
       quantity: lotForm.quantity,
       daily_dose: lotForm.daily_dose ? Number(lotForm.daily_dose) : null,
-      expiry_date: lotForm.expiry_date ? lotForm.expiry_date.toISOString() : null,
+      expiry_date: lotForm.expiry_date ? new Date(lotForm.expiry_date).toISOString() : null,
     }
     try {
       if (editingLot) {

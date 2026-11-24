@@ -13,7 +13,7 @@ export function SearchPage() {
 
   // Lot modal state — the medication is only saved when the user hits "Guardar"
   const [lotModal, setLotModal] = useState<{ med: CimaSearchResult } | null>(null)
-  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', expiry_date: null as Date | null })
+  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', expiry_date: null as string | Date | null })
   const createLot = useCreateLot()
 
   const handleAdd = (r: CimaSearchResult) => {
@@ -29,7 +29,7 @@ export function SearchPage() {
         medication_id: med.id,
         quantity: lotForm.quantity,
         daily_dose: lotForm.daily_dose ? Number(lotForm.daily_dose) : null,
-        expiry_date: lotForm.expiry_date ? lotForm.expiry_date.toISOString() : null,
+        expiry_date: lotForm.expiry_date ? new Date(lotForm.expiry_date).toISOString() : null,
       })
       notifications.show({ message: 'Lote guardado', color: 'green' })
       setLotModal(null)
