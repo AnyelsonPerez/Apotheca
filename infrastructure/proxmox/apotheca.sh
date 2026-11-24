@@ -41,7 +41,15 @@ msg_error(){ echo -e " ${RD}[ERROR]${CL} ${1}"; exit 1; }
 DEFAULT_CT_ID=$(pvesh get /cluster/nextid 2>/dev/null | tr -d '"' || echo "200")
 DEFAULT_GW=$(ip route | awk "/default/ {print \$3; exit}")
 
-# Detect rootfs storage: prefer local-lvm, fall back to local
+# Detect the first bridge on the host (vmbr0 usually)
+detect_bridge() {
+  local br
+  br=$(ip -o link show type bridge | awk -F": " "{print \$2}" | head -1)
+  echo "${br:-vmbr0}"
+}
+BRIDGE=$(detect_bridge)
+
+# Detect rootfs storage: first storage with rootdir content
 detect_storage() {
   local stor
   stor=$(pvesm status -content rootdir 2>/dev/null | awk "NR>1{print \$1}" | head -1)
@@ -68,12 +76,12 @@ CT_ID="${CT_ID:-$DEFAULT_CT_ID}"
 read -rp "$(echo -e ${BL}"IP address (CIDR, e.g. 10.10.0.220/24) or DHCP: "${CL})" CT_IP
 if [[ -z "$CT_IP" || "${CT_IP,,}" == "dhcp" ]]; then
   CT_IP="dhcp"
-  NET_CONFIG="name=eth0,ip=dhcp"
-  msg_info "Using DHCP"
+  NET_CONFIG="name=eth0,bridge=${BRIDGE},ip=dhcp"
+  msg_info "Using DHCP on bridge ${BRIDGE}"
 else
   read -rp "$(echo -e ${BL}"Gateway [${DEFAULT_GW}]: "${CL})" CT_GW
   CT_GW="${CT_GW:-$DEFAULT_GW}"
-  NET_CONFIG="name=eth0,ip=${CT_IP},gw=${CT_GW}"
+  NET_CONFIG="name=eth0,bridge=${BRIDGE},ip=${CT_IP},gw=${CT_GW}"
 fi
 
 read -rp "$(echo -e ${BL}"Disk size (GB) [8]: "${CL})" CT_DISK
@@ -83,6 +91,7 @@ echo ""
 echo -e "${BGN}Summary:${CL}"
 echo -e "  CT ID:       ${CT_ID}"
 echo -e "  IP:          ${CT_IP}"
+echo -e "  Bridge:      ${BRIDGE}"
 echo -e "  Disk:        ${CT_DISK} GB"
 echo -e "  Storage:     ${STORAGE}"
 echo -e "  Install dir: ${INSTALL_DIR}"
