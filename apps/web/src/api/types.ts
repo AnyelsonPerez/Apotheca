@@ -88,3 +88,18 @@ export interface CimaSearchResponse {
   page: number | null
   page_size: number | null
 }
+
+export interface CimaPresentation {
+  cn: string
+  nombre: string
+  comerc: boolean
+  estado?: Record<string, number>
+}
+
+export interface CimaDetail {
+  nregistro: string
+  nombre: string
+  dosis: string | null
+  presentaciones: CimaPresentation[] | null
+  principiosActivos?: { nombre: string; cantidad: string; unidad: string }[]
+}

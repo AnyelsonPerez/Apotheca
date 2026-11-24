@@ -1,10 +1,16 @@
-import { useState } from 'react'
-import { Badge, Button, Card, Group, Modal, NumberInput, Stack, Text, TextInput } from '@mantine/core'
+import { useEffect, useState } from 'react'
+import { Badge, Button, Card, Group, Loader, Modal, NumberInput, Stack, Text, TextInput } from '@mantine/core'
 import { DateInput } from '@mantine/dates'
 import { IconSearch, IconPlus, IconCheck } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
-import { useAddMedication, useCimaSearch, useCreateLot } from '../api/hooks'
+import { useAddMedication, useCimaDetail, useCimaSearch, useCreateLot } from '../api/hooks'
 import type { CimaSearchResult } from '../api/types'
+
+/** Extract the unit count from a CIMA presentation name like "..., 20 sobres" */
+function parsePresentationQty(nombre: string): number | null {
+  const match = nombre.match(/,\s*(\d+)\s+/i)
+  return match ? parseInt(match[1], 10) : null
+}
 
 export function SearchPage() {
   const [query, setQuery] = useState('')
@@ -15,6 +21,20 @@ export function SearchPage() {
   const [lotModal, setLotModal] = useState<{ med: CimaSearchResult } | null>(null)
   const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', expiry_date: null as string | Date | null })
   const createLot = useCreateLot()
+  const { data: cimaDetail, isFetching: detailLoading } = useCimaDetail(lotModal?.med.nregistro ?? null)
+
+  // Pre-fill quantity from CIMA presentation when detail loads
+  useEffect(() => {
+    if (cimaDetail?.presentaciones && lotModal) {
+      const commercial = cimaDetail.presentaciones.find((p) => p.comerc) ?? cimaDetail.presentaciones[0]
+      if (commercial) {
+        const qty = parsePresentationQty(commercial.nombre)
+        if (qty != null) {
+          setLotForm((prev) => ({ ...prev, quantity: qty }))
+        }
+      }
+    }
+  }, [cimaDetail, lotModal])
 
   const handleAdd = (r: CimaSearchResult) => {
     setLotForm({ quantity: 0, daily_dose: '', expiry_date: null })
@@ -131,7 +151,12 @@ export function SearchPage() {
             min={0}
             value={lotForm.quantity}
             onChange={(v) => setLotForm({ ...lotForm, quantity: Number(v) || 0 })}
+            rightSection={detailLoading ? <Loader size="xs" /> : null}
+            rightSectionWidth={28}
           />
+          {detailLoading && (
+            <Text size="xs" c="dimmed">Consultando presentaciones de CIMA…</Text>
+          )}
           <DateInput
             label="Fecha de caducidad"
             placeholder="Selecciona la fecha"

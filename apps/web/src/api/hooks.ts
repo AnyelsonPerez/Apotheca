@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
 import type {
   AlertsResponse,
+  CimaDetail,
   CimaSearchResponse,
   InventoryItem,
   Lot,
@@ -41,6 +42,14 @@ export function useCimaSearch(query: string) {
       return data
     },
     enabled: query.length >= 2,
+  })
+}
+
+export function useCimaDetail(nregistro: string | null) {
+  return useQuery({
+    queryKey: ['cima-detail', nregistro],
+    queryFn: () => apiFetch<CimaDetail>(`/cima/${nregistro}`),
+    enabled: !!nregistro,
   })
 }
 
