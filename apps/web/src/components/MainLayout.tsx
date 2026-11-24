@@ -8,6 +8,7 @@ const navItems = [
   { to: '/search', label: 'Buscar' },
   { to: '/inventory', label: 'Inventario' },
   { to: '/settings', label: 'Ajustes' },
+  { to: '/app', label: 'App móvil' },
 ]
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
