@@ -11,42 +11,31 @@ export function SearchPage() {
   const { data, isFetching } = useCimaSearch(query)
   const addMedication = useAddMedication()
 
-  // Lot modal state
-  const [lotModal, setLotModal] = useState<{ med: CimaSearchResult; medId: string } | null>(null)
-  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', dosage: '', expiry_date: null as Date | null })
+  // Lot modal state — the medication is only saved when the user hits "Guardar"
+  const [lotModal, setLotModal] = useState<{ med: CimaSearchResult } | null>(null)
+  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', expiry_date: null as Date | null })
   const createLot = useCreateLot()
 
   const handleAdd = (r: CimaSearchResult) => {
-    addMedication.mutate(r.nregistro, {
-      onSuccess: (med) => {
-        notifications.show({ message: 'Medicamento añadido', color: 'green' })
-        setLotForm({ quantity: 0, daily_dose: '', dosage: r.dosis || '', expiry_date: null })
-        setLotModal({ med: r, medId: med.id })
-      },
-      onError: (err) => {
-        notifications.show({ message: String(err.message), color: 'red' })
-      },
-    })
+    setLotForm({ quantity: 0, daily_dose: '', expiry_date: null })
+    setLotModal({ med: r })
   }
 
-  const handleCreateLot = () => {
+  const handleCreateLot = async () => {
     if (!lotModal) return
-    createLot.mutate(
-      {
-        medication_id: lotModal.medId,
+    try {
+      const med = await addMedication.mutateAsync(lotModal.med.nregistro)
+      await createLot.mutateAsync({
+        medication_id: med.id,
         quantity: lotForm.quantity,
         daily_dose: lotForm.daily_dose ? Number(lotForm.daily_dose) : null,
-        dosage: lotForm.dosage || null,
         expiry_date: lotForm.expiry_date ? lotForm.expiry_date.toISOString() : null,
-      },
-      {
-        onSuccess: () => {
-          notifications.show({ message: 'Lote añadido', color: 'green' })
-          setLotModal(null)
-        },
-        onError: (err) => notifications.show({ message: String(err.message), color: 'red' }),
-      },
-    )
+      })
+      notifications.show({ message: 'Lote guardado', color: 'green' })
+      setLotModal(null)
+    } catch (err) {
+      notifications.show({ message: String(err instanceof Error ? err.message : err), color: 'red' })
+    }
   }
 
   const inventoryResults = data?.inventory ?? []
@@ -157,14 +146,8 @@ export function SearchPage() {
             value={lotForm.daily_dose}
             onChange={(e) => setLotForm({ ...lotForm, daily_dose: e.target.value })}
           />
-          <TextInput
-            label="Posología"
-            placeholder="1 comprimido cada 8h"
-            value={lotForm.dosage}
-            onChange={(e) => setLotForm({ ...lotForm, dosage: e.target.value })}
-          />
-          <Button color="teal" loading={createLot.isPending} onClick={handleCreateLot}>
-            Guardar lote
+          <Button color="teal" loading={addMedication.isPending || createLot.isPending} onClick={handleCreateLot}>
+            Guardar
           </Button>
         </Stack>
       </Modal>

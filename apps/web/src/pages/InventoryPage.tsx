@@ -13,13 +13,20 @@ import {
   Text,
   TextInput,
 } from '@mantine/core'
-import { IconPlus, IconTrash } from '@tabler/icons-react'
+import { DateInput } from '@mantine/dates'
+import { IconPlus, IconTrash, IconEdit } from '@tabler/icons-react'
 import { useSearchParams } from 'react-router-dom'
 import { notifications } from '@mantine/notifications'
-import { useAlerts, useCreateLot, useDeleteLot, useDeleteMedication, useInventory } from '../api/hooks'
-import type { InventoryItem } from '../api/types'
+import { useAlerts, useCreateLot, useDeleteLot, useDeleteMedication, useInventory, useUpdateLot } from '../api/hooks'
+import type { InventoryItem, Lot } from '../api/types'
 
 type FilterType = 'all' | 'expiry' | 'depletion'
+
+function isExpiringSoon(dateStr: string): boolean {
+  const expiry = new Date(dateStr)
+  const days = Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  return days <= 30
+}
 
 export function InventoryPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -32,31 +39,51 @@ export function InventoryPage() {
   const deleteMed = useDeleteMedication()
   const deleteLot = useDeleteLot()
   const createLot = useCreateLot()
+  const updateLot = useUpdateLot()
   const [modalMed, setModalMed] = useState<InventoryItem | null>(null)
-  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', dosage: '' })
+  const [editingLot, setEditingLot] = useState<Lot | null>(null)
+  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', expiry_date: null as Date | null })
 
   const openLotModal = (med: InventoryItem) => {
     setModalMed(med)
-    setLotForm({ quantity: 0, daily_dose: '', dosage: '' })
+    setEditingLot(null)
+    setLotForm({ quantity: 0, daily_dose: '', expiry_date: null })
   }
 
-  const handleCreateLot = () => {
+  const openEditLotModal = (med: InventoryItem, lot: Lot) => {
+    setModalMed(med)
+    setEditingLot(lot)
+    setLotForm({
+      quantity: lot.quantity,
+      daily_dose: lot.daily_dose != null ? String(lot.daily_dose) : '',
+      expiry_date: lot.expiry_date ? new Date(lot.expiry_date) : null,
+    })
+  }
+
+  const closeLotModal = () => {
+    setModalMed(null)
+    setEditingLot(null)
+  }
+
+  const handleSaveLot = async () => {
     if (!modalMed) return
-    createLot.mutate(
-      {
-        medication_id: modalMed.id,
-        quantity: lotForm.quantity,
-        daily_dose: lotForm.daily_dose ? Number(lotForm.daily_dose) : null,
-        dosage: lotForm.dosage || null,
-      },
-      {
-        onSuccess: () => {
-          notifications.show({ message: 'Lote añadido', color: 'green' })
-          setModalMed(null)
-        },
-        onError: (err) => notifications.show({ message: String(err.message), color: 'red' }),
-      },
-    )
+    const lotData = {
+      quantity: lotForm.quantity,
+      daily_dose: lotForm.daily_dose ? Number(lotForm.daily_dose) : null,
+      expiry_date: lotForm.expiry_date ? lotForm.expiry_date.toISOString() : null,
+    }
+    try {
+      if (editingLot) {
+        await updateLot.mutateAsync({ id: editingLot.id, ...lotData })
+        notifications.show({ message: 'Lote actualizado', color: 'green' })
+      } else {
+        await createLot.mutateAsync({ medication_id: modalMed.id, ...lotData })
+        notifications.show({ message: 'Lote añadido', color: 'green' })
+      }
+      closeLotModal()
+    } catch (err) {
+      notifications.show({ message: String(err instanceof Error ? err.message : err), color: 'red' })
+    }
   }
 
   const handleDeleteMed = (id: string) => {
@@ -118,21 +145,30 @@ export function InventoryPage() {
             <Table.Td pl="xl">
               <Group gap="xs">
                 <Text size="xs" c="dimmed">Lote: {lot.id.slice(0, 8)}</Text>
+                {lot.expiry_date && (
+                  <Text size="xs" c={isExpiringSoon(lot.expiry_date) ? 'red.7' : 'dimmed'}>
+                    Cad: {new Date(lot.expiry_date).toLocaleDateString('es-ES')}
+                  </Text>
+                )}
                 {alerted && (
                   <Badge size="xs" variant="light" color={filter === 'expiry' ? 'orange' : 'red'}>
                     {filter === 'expiry' ? 'Caducidad' : 'Agotamiento'}
                   </Badge>
                 )}
               </Group>
-              {lot.dosage && <Text size="xs" c="dimmed">{lot.dosage}</Text>}
             </Table.Td>
             <Table.Td></Table.Td>
             <Table.Td><Badge size="xs" variant="light">{lot.quantity}</Badge></Table.Td>
             <Table.Td>{lot.daily_dose ? `${lot.daily_dose}/día` : '—'}</Table.Td>
             <Table.Td>
-              <ActionIcon variant="subtle" color="red" size="sm" onClick={() => handleDeleteLot(lot.id)}>
-                <IconTrash size={14} />
-              </ActionIcon>
+              <Group gap="xs">
+                <ActionIcon variant="subtle" color="blue" size="sm" onClick={() => openEditLotModal(med, lot)}>
+                  <IconEdit size={14} />
+                </ActionIcon>
+                <ActionIcon variant="subtle" color="red" size="sm" onClick={() => handleDeleteLot(lot.id)}>
+                  <IconTrash size={14} />
+                </ActionIcon>
+              </Group>
             </Table.Td>
           </Table.Tr>,
         )
@@ -176,13 +212,31 @@ export function InventoryPage() {
         </Text>
       )}
 
-      <Modal opened={!!modalMed} onClose={() => setModalMed(null)} title={`Añadir lote — ${modalMed?.name ?? ''}`}>
+      <Modal
+        opened={!!modalMed}
+        onClose={closeLotModal}
+        title={
+          <Group gap="xs">
+            <IconPlus size={18} color="#0CA678" />
+            <Text fw={600}>{editingLot ? 'Editar lote' : 'Añadir lote'}</Text>
+          </Group>
+        }
+      >
         <Stack>
+          <Text size="sm" c="dimmed">{modalMed?.name ?? ''}</Text>
           <NumberInput
             label="Cantidad"
             min={0}
             value={lotForm.quantity}
             onChange={(v) => setLotForm({ ...lotForm, quantity: Number(v) || 0 })}
+          />
+          <DateInput
+            label="Fecha de caducidad"
+            placeholder="Selecciona la fecha"
+            valueFormat="DD/MM/YYYY"
+            value={lotForm.expiry_date}
+            onChange={(v) => setLotForm({ ...lotForm, expiry_date: v })}
+            clearable
           />
           <TextInput
             label="Dosis diaria"
@@ -190,14 +244,8 @@ export function InventoryPage() {
             value={lotForm.daily_dose}
             onChange={(e) => setLotForm({ ...lotForm, daily_dose: e.target.value })}
           />
-          <TextInput
-            label="Posología"
-            placeholder="1 comprimido cada 8h"
-            value={lotForm.dosage}
-            onChange={(e) => setLotForm({ ...lotForm, dosage: e.target.value })}
-          />
-          <Button color="teal" loading={createLot.isPending} onClick={handleCreateLot}>
-            Guardar lote
+          <Button color="teal" loading={createLot.isPending || updateLot.isPending} onClick={handleSaveLot}>
+            {editingLot ? 'Guardar cambios' : 'Guardar lote'}
           </Button>
         </Stack>
       </Modal>
