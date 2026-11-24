@@ -1,0 +1,72 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/release-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Prebuild native Android project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Rename APK
+        run: |
+          mkdir -p artifact
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk artifact/apotheca.apk
+          ls -lh artifact/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apotheca-apk
+          path: artifact/apotheca.apk
+          retention-days: 90
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload latest artifact/apotheca.apk \
+            --clobber \
+            --title "Apotheca (latest)" \
+            --notes "Latest APK build from \`main\` branch." \
+            --repo "$GITHUB_REPOSITORY" || \
+          gh release create latest artifact/apotheca.apk \
+            --title "Apotheca (latest)" \
+            --notes "Latest APK build from \`main\` branch." \
+            --repo "$GITHUB_REPOSITORY"

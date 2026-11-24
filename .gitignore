@@ -8,6 +8,8 @@ build/
 develop-eggs/
 dist/
 downloads/
+!apps/web/public/downloads/
+!apps/web/public/downloads/.gitkeep
 eggs/
 .eggs/
 lib/

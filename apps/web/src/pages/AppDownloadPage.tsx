@@ -1,12 +1,24 @@
 import { Card, Group, Stack, Text, Button, Alert, Code, Divider } from '@mantine/core'
 import { IconDownload, IconInfoCircle, IconDeviceMobile } from '@tabler/icons-react'
 import { QRCodeSVG } from 'qrcode.react'
+import { useEffect, useState } from 'react'
+
+const APK_PATH = '/downloads/apotheca.apk'
+const GITHUB_RELEASES = 'https://github.com/AnyelsonPerez/Apotheca/releases/tag/latest'
 
 export function AppDownloadPage() {
-  // The APK download URL (relative — served by the web app or a static path)
-  const apkUrl = '/downloads/apotheca.apk'
-  // The full URL for the QR code (so mobile can scan and download)
-  const qrUrl = typeof window !== 'undefined' ? `${window.location.origin}${apkUrl}` : apkUrl
+  const [apkReady, setApkReady] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch(APK_PATH, { method: 'HEAD' })
+      .then((r) => setApkReady(r.ok && r.headers.get('content-length') !== '0'))
+      .catch(() => setApkReady(false))
+  }, [])
+
+  const apkUrl = apkReady ? APK_PATH : GITHUB_RELEASES
+  const qrUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${APK_PATH}`
+    : APK_PATH
 
   return (
     <Stack>
@@ -39,12 +51,19 @@ export function AppDownloadPage() {
           <Button
             component="a"
             href={apkUrl}
-            download
+            target={apkReady ? undefined : '_blank'}
+            rel={apkReady ? undefined : 'noopener noreferrer'}
+            download={apkReady}
             leftSection={<IconDownload size={18} />}
             color="teal"
+            loading={apkReady === null}
             mt="sm"
           >
-            Descargar APK
+            {apkReady === null
+              ? 'Comprobando…'
+              : apkReady
+                ? 'Descargar APK'
+                : 'Descargar desde GitHub'}
           </Button>
         </Stack>
       </Group>
@@ -56,17 +75,22 @@ export function AppDownloadPage() {
           <Text size="sm" fw={600}>Configuración tras la instalación</Text>
           <Text size="xs" c="dimmed">
             Tras abrir la app por primera vez, ve a <b>Ajustes</b> e introduce la URL de tu API de Apotheca
-            (por ejemplo: <Code>http://192.168.1.100:8000</Code>).
+            (por ejemplo: <Code>http://192.168.1.100</Code>).
           </Text>
         </Stack>
       </Alert>
 
-      <Alert icon={<IconInfoCircle size={16} />} color="orange" variant="light">
-        <Text size="xs" c="dimmed">
-          Si el APK no está disponible todavía, el build de CI aún no ha generado el artefacto.
-          Una vez que se complete el workflow de release, el APK se servirá desde esta ruta automáticamente.
-        </Text>
-      </Alert>
+      {apkReady === false && (
+        <Alert icon={<IconInfoCircle size={16} />} color="orange" variant="light">
+          <Text size="xs" c="dimmed">
+            El APK aún no se ha descargado al servidor. Puedes descargarlo directamente desde
+            GitHub Releases mientras tanto. Si acabas de instalar el servidor, ejecuta
+            <Code>pct enter CT_ID</Code> y luego:
+            <Code block>curl -fsSL -o /var/www/apotheca/downloads/apotheca.apk \
+  https://github.com/AnyelsonPerez/Apotheca/releases/download/latest/apotheca.apk</Code>
+          </Text>
+        </Alert>
+      )}
     </Stack>
   )
 }

@@ -154,8 +154,13 @@ msg_ok "API ready"
 
 # -- 8. Build web frontend --
 msg_info "Building web frontend"
-pct exec "$CT_ID" -- bash -c 'export DEBIAN_FRONTEND=noninteractive; if ! command -v node >/dev/null 2>&1; then curl -fsSL https://deb.nodesource.com/setup_22.x | bash -; apt-get install -y -qq nodejs >/dev/null 2>&1; fi; corepack enable; corepack prepare pnpm@latest --activate; cd '"${INSTALL_DIR}"'; pnpm install --frozen-lockfile; pnpm --filter @apotheca/web build; mkdir -p /var/www/apotheca; cp -r apps/web/dist/* /var/www/apotheca/; cp -r apps/web/public/downloads /var/www/apotheca/downloads 2>/dev/null || true'
+pct exec "$CT_ID" -- bash -c 'export DEBIAN_FRONTEND=noninteractive; if ! command -v node >/dev/null 2>&1; then curl -fsSL https://deb.nodesource.com/setup_22.x | bash -; apt-get install -y -qq nodejs >/dev/null 2>&1; fi; corepack enable; corepack prepare pnpm@latest --activate; cd '"${INSTALL_DIR}"'; pnpm install --frozen-lockfile; pnpm --filter @apotheca/web build; mkdir -p /var/www/apotheca; cp -r apps/web/dist/* /var/www/apotheca/'
 msg_ok "Web frontend built"
+
+# -- 8b. Download APK from GitHub Releases --
+msg_info "Downloading APK from GitHub Releases"
+pct exec "$CT_ID" -- bash -c 'mkdir -p /var/www/apotheca/downloads; curl -fsSL -o /var/www/apotheca/downloads/apotheca.apk https://github.com/AnyelsonPerez/Apotheca/releases/download/latest/apotheca.apk || echo "APK not available yet - build may still be running"'
+msg_ok "APK downloaded"
 
 # -- 9. Configure nginx (piped heredoc via_pct exec_stdin) --
 msg_info "Configuring nginx"
