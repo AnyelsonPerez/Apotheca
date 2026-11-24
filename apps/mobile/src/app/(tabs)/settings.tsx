@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { Card, Title, TextInput, Button, Paragraph } from 'react-native-paper';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from '@/api/client';
+import { apiFetch, getApiUrl, setApiUrl } from '@/api/client';
 import type { Setting } from '@/api/types';
 
 const labels: Record<string, string> = {
@@ -20,6 +20,22 @@ export default function SettingsScreen() {
   });
 
   const [values, setValues] = useState<Record<string, string>>({});
+  const [apiUrl, setApiUrlState] = useState('');
+
+  useEffect(() => {
+    getApiUrl().then(setApiUrlState);
+  }, []);
+
+  const [apiUrlError, setApiUrlError] = useState('');
+
+  const saveApiUrl = async () => {
+    try {
+      await setApiUrl(apiUrl);
+      setApiUrlError('');
+    } catch (err) {
+      setApiUrlError(String(err));
+    }
+  };
 
   useEffect(() => {
     if (settings) {
@@ -40,6 +56,32 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.container}>
+      <Card style={styles.card}>
+        <Card.Content>
+          <Title>URL de la API</Title>
+          <TextInput
+            label="URL del backend (http://IP_O_HOST:8000)"
+            value={apiUrl}
+            onChangeText={(t) => { setApiUrlState(t); setApiUrlError(''); }}
+            mode="outlined"
+            error={!!apiUrlError}
+            style={styles.input}
+          />
+          <Button mode="contained" buttonColor="#0CA678" onPress={saveApiUrl} style={styles.input}>
+            Guardar URL
+          </Button>
+
+          {apiUrlError.length > 0 && (
+            <Paragraph style={{ color: '#F44336', marginTop: 4 }}>{apiUrlError}</Paragraph>
+          )}
+
+          <Paragraph style={{ marginTop: 16 }}>
+            En homelab, apunta a la IP/host de Proxmox donde corre la API.
+            En el emulador Android, usa http://10.0.2.2:8000.
+          </Paragraph>
+        </Card.Content>
+      </Card>
+
       <Card style={styles.card}>
         <Card.Content>
           <Title>Ajustes</Title>

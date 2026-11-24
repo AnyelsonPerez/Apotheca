@@ -1,12 +1,50 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { TokenResponse } from './types'
 
-const API_URL = __DEV__
-  ? 'http://10.0.2.2:8000' // Android emulator -> host localhost
-  : 'https://apotheca.local'
-
 const TOKEN_KEY = 'apotheca_token'
 const REFRESH_KEY = 'apotheca_refresh'
+const API_URL_KEY = 'apotheca_api_url'
+
+const DEFAULT_API_URL = __DEV__
+  ? 'http://10.0.2.2:8000' // Android emulator -> host localhost
+  : 'http://10.0.2.2:8000'
+
+let cachedApiUrl: string | null = null
+const apiUrlListeners = new Set<(url: string | null) => void>()
+
+export async function getApiUrl(): Promise<string> {
+  if (cachedApiUrl) return cachedApiUrl
+  const stored = await AsyncStorage.getItem(API_URL_KEY)
+  const url = (stored ?? DEFAULT_API_URL).replace(/\/+$/, '')
+  cachedApiUrl = url
+  return url
+}
+
+export async function setApiUrl(url: string): Promise<void> {
+  const clean = url.trim().replace(/\/+$/, '')
+  if (!/^https?:\/\//i.test(clean)) throw new Error('URL inválida: debe empezar por http:// o https://')
+  await AsyncStorage.setItem(API_URL_KEY, clean)
+  cachedApiUrl = clean
+  apiUrlListeners.forEach((cb) => cb(clean))
+}
+
+export function clearApiUrl(): void {
+  cachedApiUrl = null
+  AsyncStorage.removeItem(API_URL_KEY)
+}
+
+export function onApiUrlChange(cb: (url: string | null) => void): () => void {
+  apiUrlListeners.add(cb)
+  return () => { apiUrlListeners.delete(cb) }
+}
+
+// Resolve the API base URL for this request (cached after first call)
+async function apiBase(): Promise<string> {
+  if (cachedApiUrl) return cachedApiUrl
+  const stored = await AsyncStorage.getItem(API_URL_KEY)
+  cachedApiUrl = (stored ?? DEFAULT_API_URL).replace(/\/+$/, '')
+  return cachedApiUrl
+}
 
 export async function getAccessToken(): Promise<string | null> {
   return AsyncStorage.getItem(TOKEN_KEY)
@@ -23,10 +61,10 @@ export async function clearTokens(): Promise<void> {
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  const refresh = await AsyncStorage.getItem(REFRESH_KEY)
+  const [refresh, base] = await Promise.all([AsyncStorage.getItem(REFRESH_KEY), apiBase()])
   if (!refresh) return null
   try {
-    const res = await fetch(`${API_URL}/auth/refresh`, {
+    const res = await fetch(`${base}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refresh }),
@@ -48,20 +86,20 @@ export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = await getAccessToken()
+  const [token, base] = await Promise.all([getAccessToken(), apiBase()])
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  let res = await fetch(`${API_URL}${path}`, { ...options, headers })
+  let res = await fetch(`${base}${path}`, { ...options, headers })
 
   if (res.status === 401) {
     const newToken = await refreshAccessToken()
     if (newToken) {
       headers['Authorization'] = `Bearer ${newToken}`
-      res = await fetch(`${API_URL}${path}`, { ...options, headers })
+      res = await fetch(`${base}${path}`, { ...options, headers })
     }
   }
 
@@ -73,5 +111,3 @@ export async function apiFetch<T>(
   if (res.status === 204) return undefined as T
   return res.json()
 }
-
-export { API_URL }
