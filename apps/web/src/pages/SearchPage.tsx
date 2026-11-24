@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Badge, Button, Card, Group, Modal, NumberInput, Stack, Text, TextInput } from '@mantine/core'
+import { Badge, Button, Card, DateInput, Group, Modal, NumberInput, Stack, Text, TextInput } from '@mantine/core'
 import { IconSearch, IconPlus, IconCheck } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
 import { useAddMedication, useCimaSearch, useCreateLot } from '../api/hooks'
@@ -12,15 +12,14 @@ export function SearchPage() {
 
   // Lot modal state
   const [lotModal, setLotModal] = useState<{ med: CimaSearchResult; medId: string } | null>(null)
-  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', dosage: '' })
+  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', dosage: '', expiry_date: null as Date | null })
   const createLot = useCreateLot()
 
   const handleAdd = (r: CimaSearchResult) => {
     addMedication.mutate(r.nregistro, {
       onSuccess: (med) => {
         notifications.show({ message: 'Medicamento añadido', color: 'green' })
-        // Pre-fill dosage from CIMA data
-        setLotForm({ quantity: 0, daily_dose: '', dosage: r.dosis || '' })
+        setLotForm({ quantity: 0, daily_dose: '', dosage: r.dosis || '', expiry_date: null })
         setLotModal({ med: r, medId: med.id })
       },
       onError: (err) => {
@@ -37,6 +36,7 @@ export function SearchPage() {
         quantity: lotForm.quantity,
         daily_dose: lotForm.daily_dose ? Number(lotForm.daily_dose) : null,
         dosage: lotForm.dosage || null,
+        expiry_date: lotForm.expiry_date ? lotForm.expiry_date.toISOString() : null,
       },
       {
         onSuccess: () => {
@@ -141,6 +141,14 @@ export function SearchPage() {
             min={0}
             value={lotForm.quantity}
             onChange={(v) => setLotForm({ ...lotForm, quantity: Number(v) || 0 })}
+          />
+          <DateInput
+            label="Fecha de caducidad"
+            placeholder="Selecciona la fecha"
+            valueFormat="DD/MM/YYYY"
+            value={lotForm.expiry_date}
+            onChange={(v) => setLotForm({ ...lotForm, expiry_date: v })}
+            clearable
           />
           <TextInput
             label="Dosis diaria"

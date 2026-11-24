@@ -3,9 +3,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button, Card, Container, PasswordInput, Stack, TextInput, Title, Text, Anchor } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLogin, useRegister } from '../api/hooks'
 import { useAuth } from '../hooks/useAuth'
+import { clearTokens } from '../api/client'
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -27,6 +28,11 @@ export function AuthPage() {
 
   const loginForm = useForm<LoginForm>({ resolver: zodResolver(loginSchema) })
   const registerForm = useForm<RegisterForm>({ resolver: zodResolver(registerSchema) })
+
+  // Clear any stale tokens from a previous session when entering auth page
+  useEffect(() => {
+    clearTokens()
+  }, [])
 
   const onLogin = (data: LoginForm) => {
     loginMutation.mutate(data, {
