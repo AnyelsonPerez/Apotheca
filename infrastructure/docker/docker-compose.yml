@@ -8,7 +8,17 @@ services:
     volumes:
       - apotheca-data:/app/data
     environment:
-      - DATABASE_PATH=/app/data/apotheca.db
+      - APOTHECA_DATABASE_PATH=/app/data/apotheca.db
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.web
+    ports:
+      - "80:80"
+    depends_on:
+      - api
     restart: unless-stopped
 
 volumes:
