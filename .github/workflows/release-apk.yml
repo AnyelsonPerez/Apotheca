@@ -42,6 +42,16 @@ jobs:
         working-directory: apps/mobile
         run: npx expo prebuild --platform android --no-install
 
+      - name: Verify icons in Android project
+        working-directory: apps/mobile
+        run: |
+          echo "=== Checking mipmap icons ==="
+          find android/app/src/main/res -name "ic_launcher*" -type f | head -20
+          echo "=== File sizes ==="
+          find android/app/src/main/res -name "ic_launcher*" -type f -exec ls -lh {} \;
+          echo "=== Adaptive icon XML ==="
+          cat android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml 2>/dev/null || echo "No adaptive icon XML found"
+
       - name: Build release APK
         working-directory: apps/mobile/android
         run: ./gradlew assembleRelease --no-daemon
