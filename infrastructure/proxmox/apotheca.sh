@@ -146,7 +146,7 @@ msg_ok "Dependencies installed"
 
 # -- 4b. Enable auto-login on console (so LXC console doesn't ask for password) --
 msg_info "Enabling console auto-login"
-pct exec "$CT_ID" -- bash -c 'mkdir -p /etc/systemd/system/serial-getty@tty1.service.d && printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear %%I \$TERM\n" > /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf && systemctl daemon-reload && systemctl restart serial-getty@tty1'
+pct exec "$CT_ID" -- bash -c 'mkdir -p /etc/systemd/system/serial-getty@tty1.service.d && printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear %%I \$TERM\n" > /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf && systemctl daemon-reload' || true
 msg_ok "Console auto-login enabled"
 
 # -- 5. Install uv (manages Python 3.12 itself, no deadsnakes needed) --
