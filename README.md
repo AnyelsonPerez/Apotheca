@@ -28,12 +28,11 @@ Data persists in a Docker volume (`apotheca-data`).
 
 ### Proxmox VE
 
-Apotheca can be deployed as an LXC container on Proxmox VE using
-[community-scripts](https://github.com/community-scripts/ProxmoxVE).
-Run this on your Proxmox host:
+Apotheca can be deployed as an LXC container on Proxmox VE.
+Run this on your Proxmox host as root:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/apotheca.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/AnyelsonPerez/Apotheca/main/infrastructure/proxmox/apotheca.sh)"
 ```
 
 Updates are handled from inside the container:
@@ -41,7 +40,7 @@ Updates are handled from inside the container:
 ```bash
 pct enter <CT_ID>
 # inside the container:
-update
+apotheca-update
 ```
 
 ## Stack

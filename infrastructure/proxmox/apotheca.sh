@@ -194,6 +194,11 @@ NGINX
 pct exec "$CT_ID" -- bash -c 'ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca; rm -f /etc/nginx/sites-enabled/default; systemctl restart nginx'
 msg_ok "nginx configured"
 
+# -- 9b. Install update script --
+msg_info "Installing update script"
+pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/update.sh ${INSTALL_DIR}/update.sh && chmod +x ${INSTALL_DIR}/update.sh && ln -sf ${INSTALL_DIR}/update.sh /usr/local/bin/apotheca-update"
+msg_ok "Update script installed (run: apotheca-update)"
+
 # -- 10. Create systemd service (piped heredoc via pct exec stdin) --
 msg_info "Creating systemd service"
 pct exec "$CT_ID" -- bash -c 'cat > /etc/systemd/system/apotheca-api.service' << SYSTEMD
@@ -244,12 +249,8 @@ echo -e "  ${BL}Container:${CL}  pct enter ${CT_ID}"
 echo -e "  ${BL}App dir:${CL}    ${INSTALL_DIR}"
 echo -e "  ${BL}Data dir:${CL}   ${DATA_DIR}"
 echo ""
-echo -e "  ${BL}Update:${CL}     pct enter ${CT_ID}"
-echo -e "                  cd ${INSTALL_DIR} && git pull"
-echo -e "                  cd apps/api && uv sync"
-echo -e "                  cd /opt/apotheca && pnpm --filter @apotheca/web build"
-echo -e "                  cp -r apps/web/dist/* /var/www/apotheca/"
-echo -e "                  systemctl restart apotheca-api"
+echo -e "  ${BL}Update:${CL}     apotheca-update"
+echo -e "                  (or: bash ${INSTALL_DIR}/update.sh)"
 echo ""
 echo -e "${YW}Next: Open the Web UI and register your first user.${CL}"
 echo -e "${YW}Then visit /app to download the Android APK.${CL}"
