@@ -54,6 +54,7 @@ self_repair() {
     mkdir -p /etc/systemd/system/serial-getty@tty1.service.d
     printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear %%I \$TERM\n" > /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf
     systemctl daemon-reload
+    systemctl restart serial-getty@tty1
     msg_ok "Console auto-login enabled"
   fi
 }

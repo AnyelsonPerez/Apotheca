@@ -146,7 +146,7 @@ msg_ok "Dependencies installed"
 
 # -- 4b. Enable auto-login on console (so LXC console doesn't ask for password) --
 msg_info "Enabling console auto-login"
-pct exec "$CT_ID" -- bash -c 'mkdir -p /etc/systemd/system/serial-getty@tty1.service.d && printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear %%I \$TERM\n" > /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf && systemctl daemon-reload'
+pct exec "$CT_ID" -- bash -c 'mkdir -p /etc/systemd/system/serial-getty@tty1.service.d && printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear %%I \$TERM\n" > /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf && systemctl daemon-reload && systemctl restart serial-getty@tty1'
 msg_ok "Console auto-login enabled"
 
 # -- 5. Install uv (manages Python 3.12 itself, no deadsnakes needed) --
@@ -181,8 +181,8 @@ msg_ok "nginx configured"
 
 # -- 9b. Install update script --
 msg_info "Installing update script"
-pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/update.sh ${INSTALL_DIR}/update.sh && chmod +x ${INSTALL_DIR}/update.sh && ln -sf ${INSTALL_DIR}/update.sh /usr/local/bin/apotheca-update"
-msg_ok "Update script installed (run: apotheca-update)"
+pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/update.sh ${INSTALL_DIR}/update.sh && chmod +x ${INSTALL_DIR}/update.sh && ln -sf ${INSTALL_DIR}/update.sh /usr/local/bin/apotheca-update && ln -sf ${INSTALL_DIR}/update.sh /usr/local/bin/update"
+msg_ok "Update script installed (run: update or apotheca-update)"
 
 # -- 10. Create systemd service (copy from repo, no heredoc needed) --
 msg_info "Creating systemd service"
