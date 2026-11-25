@@ -60,7 +60,7 @@ export default function SettingsScreen() {
         <Card.Content>
           <Title>URL de la API</Title>
           <TextInput
-            label="URL del backend (http://IP_O_HOST:8000)"
+            label="URL del servidor (http://IP_O_HOST)"
             value={apiUrl}
             onChangeText={(t) => { setApiUrlState(t); setApiUrlError(''); }}
             mode="outlined"
@@ -76,8 +76,8 @@ export default function SettingsScreen() {
           )}
 
           <Paragraph style={{ marginTop: 16 }}>
-            En homelab, apunta a la IP/host de Proxmox donde corre la API.
-            En el emulador Android, usa http://10.0.2.2:8000.
+            Introduce solo la IP o dominio de tu servidor (ej: http://192.168.50.8).
+            La app añade /api automáticamente.
           </Paragraph>
         </Card.Content>
       </Card>

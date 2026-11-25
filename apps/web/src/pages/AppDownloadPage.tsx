@@ -74,8 +74,8 @@ export function AppDownloadPage() {
         <Stack gap="xs">
           <Text size="sm" fw={600}>Configuración tras la instalación</Text>
           <Text size="xs" c="dimmed">
-            Tras abrir la app por primera vez, ve a <b>Ajustes</b> e introduce la URL de tu API de Apotheca
-            (por ejemplo: <Code>http://192.168.1.100</Code>).
+            Tras abrir la app por primera vez, ve a <b>Ajustes</b> e introduce la URL de tu servidor
+            (por ejemplo: <Code>http://192.168.1.100</Code>). La app añade <Code>/api</Code> automáticamente.
           </Text>
         </Stack>
       </Alert>

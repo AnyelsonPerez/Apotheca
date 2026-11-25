@@ -84,7 +84,7 @@ msg_ok "API restarted"
 # -- 7. Health check --
 msg_info "Health check"
 for i in $(seq 1 15); do
-  if curl -sf http://localhost:8000/health >/dev/null 2>&1; then
+  if curl -sf http://localhost:8000/api/health >/dev/null 2>&1; then
     msg_ok "API is healthy!"
     echo ""
     echo -e " ${GN}Apotheca updated successfully!${CL}"

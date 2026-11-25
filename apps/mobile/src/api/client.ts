@@ -6,23 +6,35 @@ const REFRESH_KEY = 'apotheca_refresh'
 const API_URL_KEY = 'apotheca_api_url'
 
 const DEFAULT_API_URL = __DEV__
-  ? 'http://10.0.2.2:8000' // Android emulator -> host localhost
-  : 'http://10.0.2.2:8000'
+  ? 'http://10.0.2.2:8000/api' // Android emulator -> host localhost (vite dev or uvicorn)
+  : 'http://10.0.2.2:8000/api'
+
+const API_SUFFIX = '/api'
+
+/** Normalise a user-entered server URL: strip trailing slashes, append /api if missing. */
+function normaliseApiUrl(raw: string): string {
+  const clean = raw.trim().replace(/\/+$/, '')
+  if (!/^https?:\/\//i.test(clean)) throw new Error('URL inválida: debe empezar por http:// o https://')
+  // Append /api if the user hasn't already
+  if (/\/api$/i.test(clean)) return clean
+  return clean + API_SUFFIX
+}
 
 let cachedApiUrl: string | null = null
 const apiUrlListeners = new Set<(url: string | null) => void>()
 
+/** Returns the full base URL including /api suffix (e.g. http://192.168.50.8/api). */
 export async function getApiUrl(): Promise<string> {
   if (cachedApiUrl) return cachedApiUrl
   const stored = await AsyncStorage.getItem(API_URL_KEY)
-  const url = (stored ?? DEFAULT_API_URL).replace(/\/+$/, '')
+  const raw = stored ?? DEFAULT_API_URL
+  const url = normaliseApiUrl(raw)
   cachedApiUrl = url
   return url
 }
 
 export async function setApiUrl(url: string): Promise<void> {
-  const clean = url.trim().replace(/\/+$/, '')
-  if (!/^https?:\/\//i.test(clean)) throw new Error('URL inválida: debe empezar por http:// o https://')
+  const clean = normaliseApiUrl(url)
   await AsyncStorage.setItem(API_URL_KEY, clean)
   cachedApiUrl = clean
   apiUrlListeners.forEach((cb) => cb(clean))
@@ -42,7 +54,7 @@ export function onApiUrlChange(cb: (url: string | null) => void): () => void {
 async function apiBase(): Promise<string> {
   if (cachedApiUrl) return cachedApiUrl
   const stored = await AsyncStorage.getItem(API_URL_KEY)
-  cachedApiUrl = (stored ?? DEFAULT_API_URL).replace(/\/+$/, '')
+  cachedApiUrl = normaliseApiUrl(stored ?? DEFAULT_API_URL)
   return cachedApiUrl
 }
 

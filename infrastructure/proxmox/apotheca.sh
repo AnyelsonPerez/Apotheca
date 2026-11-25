@@ -176,14 +176,17 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    location /auth      { proxy_pass http://127.0.0.1:8000; }
-    location /cima      { proxy_pass http://127.0.0.1:8000; }
-    location /inventory { proxy_pass http://127.0.0.1:8000; }
-    location /settings  { proxy_pass http://127.0.0.1:8000; }
-    location /alerts    { proxy_pass http://127.0.0.1:8000; }
-    location /health    { proxy_pass http://127.0.0.1:8000; }
-    location /docs      { proxy_pass http://127.0.0.1:8000; }
-    location /openapi   { proxy_pass http://127.0.0.1:8000; }
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /api {
+        return 301 /api/;
+    }
 
     location /downloads/ {
         alias /var/www/apotheca/downloads/;
@@ -224,7 +227,7 @@ msg_ok "Service created and started"
 # -- 11. Health check --
 msg_info "Waiting for API health check"
 for i in $(seq 1 30); do
-  if pct exec "$CT_ID" -- bash -c "curl -sf http://localhost:8000/health" 2>/dev/null; then
+  if pct exec "$CT_ID" -- bash -c "curl -sf http://localhost:8000/api/health" 2>/dev/null; then
     echo ""
     msg_ok "API is healthy!"
     break
@@ -242,8 +245,7 @@ echo ""
 echo -e "${GN}${APP} has been successfully installed!${CL}"
 echo ""
 echo -e "  ${BL}Web UI:${CL}    http://${CT_IP%%/*}"
-echo -e "  ${BL}API:${CL}       http://${CT_IP%%/*}:8000"
-echo -e "  ${BL}API Docs:${CL}  http://${CT_IP%%/*}:8000/docs"
+echo -e "  ${BL}API Docs:${CL}  http://${CT_IP%%/*}/api/docs"
 echo ""
 echo -e "  ${BL}Container:${CL}  pct enter ${CT_ID}"
 echo -e "  ${BL}App dir:${CL}    ${INSTALL_DIR}"

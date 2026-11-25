@@ -26,6 +26,9 @@ app = FastAPI(
     description="Self-hosted pharmacy management API",
     version="0.1.0",
     lifespan=lifespan,
+    openapi_url="/api/openapi.json",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
 )
 
 app.add_middleware(
@@ -36,14 +39,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router)
-app.include_router(cima.router)
-app.include_router(inventory.router)
-app.include_router(settings.router)
-app.include_router(alerts.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(cima.router, prefix="/api")
+app.include_router(inventory.router, prefix="/api")
+app.include_router(settings.router, prefix="/api")
+app.include_router(alerts.router, prefix="/api")
 
 
-@app.get("/health")
+@app.get("/api/health")
 async def health(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))

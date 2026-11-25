@@ -1,4 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL ?? ''
+// In production (nginx), the API is at /api. In dev, Vite proxies /api -> 127.0.0.1:8000.
+const API_URL = import.meta.env.VITE_API_URL ?? '/api'
 
 const TOKEN_KEY = 'apotheca_token'
 const REFRESH_KEY = 'apotheca_refresh'
