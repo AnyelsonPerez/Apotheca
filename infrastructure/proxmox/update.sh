@@ -27,26 +27,22 @@ msg_info() { echo -e " ${BL}[INFO]${CL} ${1}"; }
 msg_ok()   { echo -e " ${GN}[OK]${CL}   ${1}"; }
 msg_error(){ echo -e " ${RD}[ERROR]${CL} ${1}"; exit 1; }
 
-# -- Self-repair: ensure nginx config, systemd service, and auto-login exist --
+# -- Self-repair: sync nginx config, systemd service, and auto-login --
 self_repair() {
-  # nginx config
-  if [ ! -f /etc/nginx/sites-available/apotheca ]; then
-    msg_info "Repairing nginx config"
-    cp "$INSTALL_DIR/infrastructure/proxmox/nginx-apotheca.conf" /etc/nginx/sites-available/apotheca
-    ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca
-    rm -f /etc/nginx/sites-enabled/default
-    systemctl restart nginx
-    msg_ok "nginx config repaired"
-  fi
+  # nginx config — always sync so config changes in the repo are applied
+  msg_info "Syncing nginx config"
+  cp "$INSTALL_DIR/infrastructure/proxmox/nginx-apotheca.conf" /etc/nginx/sites-available/apotheca
+  ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca
+  rm -f /etc/nginx/sites-enabled/default
+  nginx -t 2>/dev/null && systemctl reload nginx || systemctl restart nginx
+  msg_ok "nginx config synced"
 
-  # systemd service
-  if [ ! -f /etc/systemd/system/apotheca-api.service ]; then
-    msg_info "Repairing systemd service"
-    cp "$INSTALL_DIR/infrastructure/proxmox/apotheca-api.service" /etc/systemd/system/apotheca-api.service
-    systemctl daemon-reload
-    systemctl enable -q apotheca-api
-    msg_ok "systemd service repaired"
-  fi
+  # systemd service — always sync
+  msg_info "Syncing systemd service"
+  cp "$INSTALL_DIR/infrastructure/proxmox/apotheca-api.service" /etc/systemd/system/apotheca-api.service
+  systemctl daemon-reload
+  systemctl enable -q apotheca-api
+  msg_ok "systemd service synced"
 
   # auto-login on console
   if [ ! -f /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf ]; then
