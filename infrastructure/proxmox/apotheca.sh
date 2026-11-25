@@ -105,9 +105,16 @@ read -rp "$(echo -e "${YW}Press Enter to continue, Ctrl+C to abort...${CL}")"
 msg_info "Updating LXC template cache"
 pveam update -q 2>/dev/null || true
 
-TEMPLATE="debian-12-standard_12.7-1_amd64.tar.zst"
-if ! pveam list "$TEMPLATE_STORAGE" 2>/dev/null | grep -q "$TEMPLATE"; then
-  pveam download "$TEMPLATE_STORAGE" "$TEMPLATE"
+# Try to find any debian-12 template already downloaded, otherwise download latest
+TEMPLATE=$(pveam list "$TEMPLATE_STORAGE" 2>/dev/null | awk '{print $1}' | grep -E 'debian-12-standard' | sort -V | tail -1 | sed "s|.*:vztmpl/||")
+if [[ -z "$TEMPLATE" ]]; then
+  TEMPLATE=$(pveam available 2>/dev/null | awk '{print $2}' | grep -E 'debian-12-standard' | sort -V | tail -1)
+  if [[ -n "$TEMPLATE" ]]; then
+    pveam download "$TEMPLATE_STORAGE" "$TEMPLATE"
+  else
+    TEMPLATE="debian-12-standard_12.7-1_amd64.tar.zst"
+    pveam download "$TEMPLATE_STORAGE" "$TEMPLATE" 2>/dev/null || true
+  fi
 fi
 msg_ok "Template ready"
 
@@ -136,6 +143,15 @@ msg_ok "Container started"
 msg_info "Installing system dependencies"
 pct exec "$CT_ID" -- bash -c 'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq; apt-get install -y -qq curl git ca-certificates nginx >/dev/null 2>&1'
 msg_ok "Dependencies installed"
+
+# -- 4b. Enable auto-login on console (so LXC console doesn't ask for password) --
+pct exec "$CT_ID" -- bash -c 'mkdir -p /etc/systemd/system/serial-getty@tty1.service.d; cat > /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf << EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
+EOF
+systemctl daemon-reload'
+msg_ok "Console auto-login enabled"
 
 # -- 5. Install uv (manages Python 3.12 itself, no deadsnakes needed) --
 msg_info "Installing uv"
