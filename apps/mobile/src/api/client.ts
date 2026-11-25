@@ -40,6 +40,12 @@ export async function setApiUrl(url: string): Promise<void> {
   apiUrlListeners.forEach((cb) => cb(clean))
 }
 
+/** Returns true if the user has explicitly set a server URL. */
+export async function hasServerUrl(): Promise<boolean> {
+  const stored = await AsyncStorage.getItem(API_URL_KEY)
+  return stored !== null && stored.length > 0
+}
+
 export function clearApiUrl(): void {
   cachedApiUrl = null
   AsyncStorage.removeItem(API_URL_KEY)

@@ -13,6 +13,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
   const mutation = useMutation({
@@ -73,7 +74,13 @@ export default function LoginScreen() {
           value={password}
           onChangeText={setPassword}
           mode="outlined"
-          secureTextEntry
+          secureTextEntry={!showPassword}
+          right={
+            <TextInput.Icon
+              icon={showPassword ? 'eye-off' : 'eye'}
+              onPress={() => setShowPassword(!showPassword)}
+            />
+          }
           style={styles.input}
         />
 
