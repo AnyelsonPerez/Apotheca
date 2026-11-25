@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Camera, useCameraDevice, useCameraPermission, useObjectOutput } from 'react-native-vision-camera';
-import type { ScannedCode } from 'react-native-vision-camera';
+import { Camera, useCameraDevice, useCameraPermission, useCodeScanner } from 'react-native-vision-camera';
 import { Card, Button, Title, Paragraph, ActivityIndicator } from 'react-native-paper';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/api/client';
@@ -16,24 +15,6 @@ export default function ScannerScreen() {
   const qc = useQueryClient();
   const isScanningRef = useRef(false);
 
-  const handleObjectsScanned = useCallback((objects: ScannedCode[]) => {
-    if (isScanningRef.current) return;
-    for (const obj of objects) {
-      if (obj.value) {
-        isScanningRef.current = true;
-        const code = obj.value;
-        setScannedCode(code);
-        searchByBarcode(code);
-        break;
-      }
-    }
-  }, []);
-
-  const objectOutput = useObjectOutput({
-    types: ['ean-13', 'ean-8', 'qr', 'code-128', 'upc-e'],
-    onObjectsScanned: handleObjectsScanned as any,
-  });
-
   const searchByBarcode = async (barcode: string) => {
     setSearching(true);
     try {
@@ -46,6 +27,24 @@ export default function ScannerScreen() {
     }
     setSearching(false);
   };
+
+  const onCodeScanned = useCallback((codes: { value?: string }[]) => {
+    if (isScanningRef.current) return;
+    for (const code of codes) {
+      if (code.value) {
+        isScanningRef.current = true;
+        const value = code.value;
+        setScannedCode(value);
+        searchByBarcode(value);
+        break;
+      }
+    }
+  }, []);
+
+  const codeScanner = useCodeScanner({
+    codeTypes: ['ean-13', 'ean-8', 'qr', 'code-128', 'upc-e'],
+    onCodeScanned,
+  });
 
   const addMutation = useMutation({
     mutationFn: (nregistro: string) =>
@@ -126,7 +125,7 @@ export default function ScannerScreen() {
       <Camera
         device={device}
         isActive={true}
-        outputs={[objectOutput]}
+        codeScanner={codeScanner}
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.overlay}>
