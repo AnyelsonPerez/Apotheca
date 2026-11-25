@@ -7,9 +7,13 @@
     "dev:web": "pnpm --filter @apotheca/web dev",
     "dev:mobile": "pnpm --filter @apotheca/mobile start",
     "build:web": "pnpm --filter @apotheca/web build",
-    "lint:web": "pnpm --filter @apotheca/web lint"
+    "lint:web": "pnpm --filter @apotheca/web lint",
+    "render-icons": "node scripts/render-icons.js"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2"
   }
 }
