@@ -145,12 +145,8 @@ pct exec "$CT_ID" -- bash -c 'export DEBIAN_FRONTEND=noninteractive; apt-get upd
 msg_ok "Dependencies installed"
 
 # -- 4b. Enable auto-login on console (so LXC console doesn't ask for password) --
-pct exec "$CT_ID" -- bash -c 'mkdir -p /etc/systemd/system/serial-getty@tty1.service.d; cat > /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf << EOF
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin root --noclear %I $TERM
-EOF
-systemctl daemon-reload'
+msg_info "Enabling console auto-login"
+pct exec "$CT_ID" -- bash -c 'mkdir -p /etc/systemd/system/serial-getty@tty1.service.d && printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear %%I \$TERM\n" > /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf && systemctl daemon-reload'
 msg_ok "Console auto-login enabled"
 
 # -- 5. Install uv (manages Python 3.12 itself, no deadsnakes needed) --
@@ -178,39 +174,9 @@ msg_info "Downloading APK from GitHub Releases"
 pct exec "$CT_ID" -- bash -c 'mkdir -p /var/www/apotheca/downloads; curl -fsSL -o /var/www/apotheca/downloads/apotheca.apk https://github.com/AnyelsonPerez/Apotheca/releases/download/latest/apotheca.apk || echo "APK not available yet - build may still be running"'
 msg_ok "APK downloaded"
 
-# -- 9. Configure nginx (piped heredoc via pct exec stdin) --
+# -- 9. Configure nginx (copy from repo, no heredoc needed) --
 msg_info "Configuring nginx"
-pct exec "$CT_ID" -- bash -c 'cat > /etc/nginx/sites-available/apotheca' << 'NGINX'
-server {
-    listen 80;
-    server_name _;
-
-    root /var/www/apotheca;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location = /api {
-        return 301 /api/;
-    }
-
-    location /downloads/ {
-        alias /var/www/apotheca/downloads/;
-        types { application/vnd.android.package-archive apk; }
-    }
-}
-NGINX
-pct exec "$CT_ID" -- bash -c 'ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca; rm -f /etc/nginx/sites-enabled/default; systemctl restart nginx'
+pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/nginx-apotheca.conf /etc/nginx/sites-available/apotheca && ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca && rm -f /etc/nginx/sites-enabled/default && systemctl restart nginx"
 msg_ok "nginx configured"
 
 # -- 9b. Install update script --
@@ -218,26 +184,9 @@ msg_info "Installing update script"
 pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/update.sh ${INSTALL_DIR}/update.sh && chmod +x ${INSTALL_DIR}/update.sh && ln -sf ${INSTALL_DIR}/update.sh /usr/local/bin/apotheca-update"
 msg_ok "Update script installed (run: apotheca-update)"
 
-# -- 10. Create systemd service (piped heredoc via pct exec stdin) --
+# -- 10. Create systemd service (copy from repo, no heredoc needed) --
 msg_info "Creating systemd service"
-pct exec "$CT_ID" -- bash -c 'cat > /etc/systemd/system/apotheca-api.service' << SYSTEMD
-[Unit]
-Description=Apotheca API (FastAPI)
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=${INSTALL_DIR}/apps/api
-Environment=APOTHECA_DATABASE_PATH=${DATA_DIR}/apotheca.db
-Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/root/.local/bin/uv run uvicorn apotheca_api.app:app --host 127.0.0.1 --port 8000
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-SYSTEMD
-pct exec "$CT_ID" -- bash -c 'systemctl daemon-reload; systemctl enable -q apotheca-api; systemctl start apotheca-api'
+pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/apotheca-api.service /etc/systemd/system/apotheca-api.service && systemctl daemon-reload && systemctl enable -q apotheca-api && systemctl start apotheca-api"
 msg_ok "Service created and started"
 
 # -- 11. Health check --

@@ -1,0 +1,15 @@
+[Unit]
+Description=Apotheca API (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/apotheca/apps/api
+Environment=APOTHECA_DATABASE_PATH=/var/lib/apotheca/apotheca.db
+Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/root/.local/bin/uv run uvicorn apotheca_api.app:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

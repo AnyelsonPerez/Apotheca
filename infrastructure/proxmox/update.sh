@@ -27,6 +27,37 @@ msg_info() { echo -e " ${BL}[INFO]${CL} ${1}"; }
 msg_ok()   { echo -e " ${GN}[OK]${CL}   ${1}"; }
 msg_error(){ echo -e " ${RD}[ERROR]${CL} ${1}"; exit 1; }
 
+# -- Self-repair: ensure nginx config, systemd service, and auto-login exist --
+self_repair() {
+  # nginx config
+  if [ ! -f /etc/nginx/sites-available/apotheca ]; then
+    msg_info "Repairing nginx config"
+    cp "$INSTALL_DIR/infrastructure/proxmox/nginx-apotheca.conf" /etc/nginx/sites-available/apotheca
+    ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca
+    rm -f /etc/nginx/sites-enabled/default
+    systemctl restart nginx
+    msg_ok "nginx config repaired"
+  fi
+
+  # systemd service
+  if [ ! -f /etc/systemd/system/apotheca-api.service ]; then
+    msg_info "Repairing systemd service"
+    cp "$INSTALL_DIR/infrastructure/proxmox/apotheca-api.service" /etc/systemd/system/apotheca-api.service
+    systemctl daemon-reload
+    systemctl enable -q apotheca-api
+    msg_ok "systemd service repaired"
+  fi
+
+  # auto-login on console
+  if [ ! -f /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf ]; then
+    msg_info "Enabling console auto-login"
+    mkdir -p /etc/systemd/system/serial-getty@tty1.service.d
+    printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear %%I \$TERM\n" > /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf
+    systemctl daemon-reload
+    msg_ok "Console auto-login enabled"
+  fi
+}
+
 # -- 0. Check for updates --
 msg_info "Checking for updates..."
 cd "$INSTALL_DIR"
@@ -39,6 +70,8 @@ REMOTE=$(git rev-parse origin/main)
 
 if [ "$LOCAL" = "$REMOTE" ]; then
   msg_ok "Apotheca is already up to date."
+  # Still run self-repair in case nginx/service are broken
+  self_repair
   exit 0
 fi
 
@@ -76,9 +109,10 @@ mkdir -p "$WEB_DIR/downloads"
 curl -fsSL -o "$WEB_DIR/downloads/apotheca.apk" "https://github.com/AnyelsonPerez/Apotheca/releases/download/latest/apotheca.apk" || echo "  APK not available yet"
 msg_ok "APK updated"
 
-# -- 6. Restart API --
+# -- 6. Self-repair (nginx, service, auto-login) then restart API --
+self_repair
 msg_info "Restarting API service"
-systemctl restart apotheca-api
+systemctl restart apotheca-api 2>/dev/null || systemctl start apotheca-api
 msg_ok "API restarted"
 
 # -- 7. Health check --
