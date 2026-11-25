@@ -1,6 +1,8 @@
-import { AppShell, Burger, Group, NavLink, Text } from '@mantine/core'
+import { ActionIcon, AppShell, Burger, Group, NavLink, Text, Tooltip } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { NavLink as RouterLink, useLocation } from 'react-router-dom'
+import { IconSun, IconMoon } from '@tabler/icons-react'
+import { useMantineColorScheme } from '@mantine/core'
 import { useAuth } from '../hooks/useAuth'
 
 const navItems = [
@@ -15,6 +17,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const [opened, { toggle }] = useDisclosure()
   const location = useLocation()
   const { isAuthenticated, logout } = useAuth()
+  const { colorScheme, setColorScheme } = useMantineColorScheme()
 
   return (
     <AppShell
@@ -28,11 +31,23 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <Text fw={700} size="lg" c="teal.7">Apotheca</Text>
           </Group>
-          {isAuthenticated && (
-            <Text size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={logout}>
-              Cerrar sesión
-            </Text>
-          )}
+          <Group gap="sm">
+            <Tooltip label={colorScheme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                onClick={() => setColorScheme(colorScheme === 'dark' ? 'light' : 'dark')}
+                aria-label="Cambiar tema"
+              >
+                {colorScheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
+              </ActionIcon>
+            </Tooltip>
+            {isAuthenticated && (
+              <Text size="sm" c="dimmed" style={{ cursor: 'pointer' }} onClick={logout}>
+                Cerrar sesión
+              </Text>
+            )}
+          </Group>
         </Group>
       </AppShell.Header>
       <AppShell.Navbar p="xs">

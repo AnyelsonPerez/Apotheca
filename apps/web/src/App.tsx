@@ -1,4 +1,4 @@
-import { MantineProvider } from '@mantine/core'
+import { MantineProvider, createTheme, localStorageColorSchemeManager } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
@@ -11,9 +11,18 @@ const queryClient = new QueryClient({
   },
 })
 
+const theme = createTheme({
+  primaryColor: 'teal',
+  defaultRadius: 'md',
+})
+
 function App() {
   return (
-    <MantineProvider>
+    <MantineProvider
+      theme={theme}
+      defaultColorScheme="light"
+      colorSchemeManager={localStorageColorSchemeManager({ key: 'apotheca-color-scheme' })}
+    >
       <Notifications position="top-right" />
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>

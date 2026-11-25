@@ -162,7 +162,7 @@ msg_info "Downloading APK from GitHub Releases"
 pct exec "$CT_ID" -- bash -c 'mkdir -p /var/www/apotheca/downloads; curl -fsSL -o /var/www/apotheca/downloads/apotheca.apk https://github.com/AnyelsonPerez/Apotheca/releases/download/latest/apotheca.apk || echo "APK not available yet - build may still be running"'
 msg_ok "APK downloaded"
 
-# -- 9. Configure nginx (piped heredoc via_pct exec_stdin) --
+# -- 9. Configure nginx (piped heredoc via pct exec stdin) --
 msg_info "Configuring nginx"
 pct exec "$CT_ID" -- bash -c 'cat > /etc/nginx/sites-available/apotheca' << 'NGINX'
 server {
@@ -176,17 +176,18 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    location /auth/      { proxy_pass http://127.0.0.1:8000; }
-    location /cima/      { proxy_pass http://127.0.0.1:8000; }
-    location /inventory/ { proxy_pass http://127.0.0.1:8000; }
-    location /settings/  { proxy_pass http://127.0.0.1:8000; }
-    location /alerts/    { proxy_pass http://127.0.0.1:8000; }
-    location /health     { proxy_pass http://127.0.0.1:8000; }
-    location /docs       { proxy_pass http://127.0.0.1:8000; }
-    location /openapi    { proxy_pass http://127.0.0.1:8000; }
+    location /auth      { proxy_pass http://127.0.0.1:8000; }
+    location /cima      { proxy_pass http://127.0.0.1:8000; }
+    location /inventory { proxy_pass http://127.0.0.1:8000; }
+    location /settings  { proxy_pass http://127.0.0.1:8000; }
+    location /alerts    { proxy_pass http://127.0.0.1:8000; }
+    location /health    { proxy_pass http://127.0.0.1:8000; }
+    location /docs      { proxy_pass http://127.0.0.1:8000; }
+    location /openapi   { proxy_pass http://127.0.0.1:8000; }
 
     location /downloads/ {
         alias /var/www/apotheca/downloads/;
+        types { application/vnd.android.package-archive apk; }
     }
 }
 NGINX

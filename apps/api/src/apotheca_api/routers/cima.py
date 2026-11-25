@@ -133,6 +133,49 @@ async def search_medications(
     }
 
 
+@router.get("/barcode/{cn}")
+async def search_by_cn(cn: str, db: Session = Depends(get_db)):
+    """Search CIMA by codigo nacional (scanned barcode CN).
+
+    Spanish medication barcodes encode the 6-digit codigo nacional (CN).
+    The scanner reads the full EAN-13; we extract the CN digits and look it up.
+    """
+    # Extract numeric digits (strip EAN-13 check digit / country prefix noise)
+    digits = ''.join(c for c in cn if c.isdigit())
+    # CIMA expects the 6-digit CN. EAN-13 barcodes encode it as digits 1-6.
+    if len(digits) >= 6:
+        cn_clean = digits[:6]
+    else:
+        cn_clean = digits
+
+    client = get_cima_client()
+    try:
+        data = await client.search_by_cn(cn_clean)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Error consultando CIMA: {exc}",
+        )
+
+    resultados = data.get("resultados", []) or []
+    if not resultados:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontro medicamento con CN {cn_clean}",
+        )
+
+    med = resultados[0]
+    return {
+        "nregistro": med.get("nregistro"),
+        "nombre": med.get("nombre"),
+        "pactivos": med.get("pactivos"),
+        "labtitular": med.get("labtitular"),
+        "cpresc": med.get("cpresc"),
+        "comerc": med.get("comerc"),
+        "dosis": med.get("dosis"),
+    }
+
+
 @router.get("/{nregistro}")
 async def get_medication_detail(nregistro: str, db: Session = Depends(get_db)):
     cached = db.query(Medication).filter(Medication.national_code == nregistro).first()

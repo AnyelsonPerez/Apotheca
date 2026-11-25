@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Card, Group, Loader, Modal, NumberInput, Stack, Text, TextInput } from '@mantine/core'
+import { Badge, Button, Card, Group, Loader, Modal, NumberInput, Stack, Text, TextInput, ActionIcon, Tooltip } from '@mantine/core'
 import { DateInput } from '@mantine/dates'
-import { IconSearch, IconPlus, IconCheck } from '@tabler/icons-react'
+import { IconSearch, IconPlus, IconCheck, IconBarcode } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
-import { useAddMedication, useCimaDetail, useCimaSearch, useCreateLot } from '../api/hooks'
+import { useAddMedication, useCimaDetail, useCimaSearch, useCimaBarcode, useCreateLot } from '../api/hooks'
+import { BarcodeScannerModal } from '../components/BarcodeScannerModal'
 import type { CimaSearchResult } from '../api/types'
 
 /** Extract the unit count from a CIMA presentation name like "..., 20 sobres" */
@@ -16,6 +17,11 @@ export function SearchPage() {
   const [query, setQuery] = useState('')
   const { data, isFetching } = useCimaSearch(query)
   const addMedication = useAddMedication()
+
+  // Barcode scanner state
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [scannedCn, setScannedCn] = useState<string | null>(null)
+  const { data: barcodeResult, isError: barcodeError, error: barcodeErrMsg } = useCimaBarcode(scannedCn)
 
   // Lot modal state — the medication is only saved when the user hits "Guardar"
   const [lotModal, setLotModal] = useState<{ med: CimaSearchResult } | null>(null)
@@ -35,6 +41,33 @@ export function SearchPage() {
       }
     }
   }, [cimaDetail, lotModal])
+
+  // Handle barcode scan result
+  useEffect(() => {
+    if (!scannedCn) return
+    if (barcodeResult) {
+      // Found medication via barcode — open the lot modal directly
+      setLotModal({
+        med: {
+          nregistro: barcodeResult.nregistro,
+          nombre: barcodeResult.nombre,
+          pactivos: barcodeResult.pactivos,
+          labtitular: barcodeResult.labtitular,
+          dosis: barcodeResult.dosis,
+          cpresc: barcodeResult.cpresc,
+        },
+      })
+      setLotForm({ quantity: 0, daily_dose: '', expiry_date: null })
+      setScannedCn(null)
+      setScannerOpen(false)
+    } else if (barcodeError) {
+      notifications.show({
+        message: `No se encontró el medicamento en CIMA: ${barcodeErrMsg instanceof Error ? barcodeErrMsg.message : 'CN no encontrado'}`,
+        color: 'red',
+      })
+      setScannedCn(null)
+    }
+  }, [scannedCn, barcodeResult, barcodeError, barcodeErrMsg])
 
   const handleAdd = (r: CimaSearchResult) => {
     setLotForm({ quantity: 0, daily_dose: '', expiry_date: null })
@@ -103,11 +136,30 @@ export function SearchPage() {
   return (
     <Stack>
       <Text fw={700} size="xl">Buscar medicamento</Text>
-      <TextInput
-        placeholder="Busca por nombre o principio activo…"
-        leftSection={<IconSearch size={16} />}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
+      <Group gap="xs" align="flex-end">
+        <TextInput
+          placeholder="Busca por nombre o principio activo…"
+          leftSection={<IconSearch size={16} />}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={{ flex: 1 }}
+        />
+        <Tooltip label="Escanear código de barras">
+          <ActionIcon
+            variant="light"
+            color="teal"
+            size="lg"
+            onClick={() => setScannerOpen(true)}
+            aria-label="Escanear código de barras"
+          >
+            <IconBarcode size={20} />
+          </ActionIcon>
+        </Tooltip>
+      </Group>
+      <BarcodeScannerModal
+        opened={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={(code) => setScannedCn(code)}
       />
       <Stack gap="xs">
         {isFetching && <Text c="dimmed">Buscando…</Text>}

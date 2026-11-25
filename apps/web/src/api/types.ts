@@ -81,6 +81,16 @@ export interface CimaSearchResult {
   medication_id?: string
 }
 
+export interface CimaBarcodeResult {
+  nregistro: string
+  nombre: string
+  pactivos: string
+  labtitular: string
+  cpresc: string
+  comerc: boolean
+  dosis: string
+}
+
 export interface CimaSearchResponse {
   inventory: CimaSearchResult[]
   cima: CimaSearchResult[]

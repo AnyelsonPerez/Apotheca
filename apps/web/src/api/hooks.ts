@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
 import type {
   AlertsResponse,
+  CimaBarcodeResult,
   CimaDetail,
   CimaSearchResponse,
   InventoryItem,
@@ -50,6 +51,16 @@ export function useCimaDetail(nregistro: string | null) {
     queryKey: ['cima-detail', nregistro],
     queryFn: () => apiFetch<CimaDetail>(`/cima/${nregistro}`),
     enabled: !!nregistro,
+  })
+}
+
+// --- Barcode lookup (CIMA by codigo nacional) ---
+export function useCimaBarcode(cn: string | null) {
+  return useQuery({
+    queryKey: ['cima-barcode', cn],
+    queryFn: () => apiFetch<CimaBarcodeResult>(`/cima/barcode/${cn}`),
+    enabled: !!cn,
+    retry: 0,
   })
 }
 

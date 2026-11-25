@@ -27,6 +27,10 @@ class CimaClient:
     async def search_by_active_ingredient(self, pactivos: str, page: int = 1, page_size: int = 25) -> dict:
         return await self._get("/medicamentos", {"pactivos": pactivos, "pagina": page, "tamanioPagina": page_size})
 
+    async def search_by_cn(self, cn: str) -> dict:
+        """Search by codigo nacional (barcode CN)."""
+        return await self._get("/medicamentos", {"codigoNacional": cn})
+
     async def get_medication(self, nregistro: str) -> dict:
         return await self._get("/medicamento", {"nregistro": nregistro})
 
