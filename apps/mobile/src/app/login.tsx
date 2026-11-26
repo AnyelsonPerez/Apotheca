@@ -89,6 +89,12 @@ export default function LoginScreen() {
 
   const isLoading = mutation.isPending || resetRequestMutation.isPending || resetConfirmMutation.isPending
 
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  const passwordValid = password.length >= 8
+  const canSubmit = mode === 'reset'
+    ? emailValid && (!resetSent || (resetToken.trim().length > 0 && newPassword.length >= 8))
+    : emailValid && passwordValid && (mode !== 'register' || name.trim().length > 0)
+
   const getTitle = () => {
     if (mode === 'login') return 'Inicia sesión'
     if (mode === 'register') return 'Crea tu cuenta'
@@ -130,6 +136,7 @@ export default function LoginScreen() {
             mode="outlined"
             keyboardType="email-address"
             autoCapitalize="none"
+            error={email.length > 0 && !emailValid}
             style={styles.input}
           />
 
@@ -140,6 +147,7 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               mode="outlined"
               secureTextEntry={!showPassword}
+              error={password.length > 0 && !passwordValid}
               right={
                 <TextInput.Icon
                   icon={showPassword ? 'eye-off' : 'eye'}
@@ -170,6 +178,7 @@ export default function LoginScreen() {
                 onChangeText={setNewPassword}
                 mode="outlined"
                 secureTextEntry={!showPassword}
+                error={newPassword.length > 0 && newPassword.length < 8}
                 right={
                   <TextInput.Icon
                     icon={showPassword ? 'eye-off' : 'eye'}
@@ -191,7 +200,7 @@ export default function LoginScreen() {
             mode="contained"
             onPress={handleSubmit}
             loading={isLoading}
-            disabled={mode === 'reset' && resetDone}
+            disabled={!canSubmit || (mode === 'reset' && resetDone)}
             style={styles.button}
             buttonColor={BrandColors.primary}
           >
