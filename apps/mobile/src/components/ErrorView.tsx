@@ -1,5 +1,6 @@
 import { View, StyleSheet } from 'react-native';
 import { Text, Button } from 'react-native-paper';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { BrandColors } from '@/constants/theme';
 
 interface ErrorViewProps {
@@ -10,7 +11,7 @@ interface ErrorViewProps {
 export function ErrorView({ message = 'Algo salió mal', onRetry }: ErrorViewProps) {
   return (
     <View style={styles.container}>
-      <Text variant="headlineSmall" style={[styles.icon, { color: BrandColors.danger }]}>⚠</Text>
+      <MaterialCommunityIcons name="cloud-off-outline" size={56} color={BrandColors.danger} />
       <Text variant="bodyLarge" style={styles.message}>{message}</Text>
       {onRetry && (
         <Button
@@ -28,7 +29,6 @@ export function ErrorView({ message = 'Algo salió mal', onRetry }: ErrorViewPro
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  icon: { fontSize: 48, marginBottom: 8 },
-  message: { textAlign: 'center', opacity: 0.7, marginBottom: 16 },
+  message: { textAlign: 'center', opacity: 0.7, marginBottom: 16, marginTop: 12 },
   button: { marginTop: 8 },
 });
