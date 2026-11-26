@@ -3,6 +3,7 @@ import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { TextInput, Button, Text, Title, useTheme } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { getApiUrl, setApiUrl } from '@/api/client';
+import { BrandColors } from '@/constants/theme';
 
 export default function SetupScreen() {
   const theme = useTheme();
@@ -60,7 +61,7 @@ export default function SetupScreen() {
           loading={checking}
           disabled={!url.trim()}
           style={styles.button}
-          buttonColor="#0CA678"
+          buttonColor={BrandColors.primary}
         >
           Conectar
         </Button>
@@ -77,10 +78,10 @@ export default function SetupScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center' },
   form: { padding: 24 },
-  title: { fontSize: 32, textAlign: 'center', color: '#0CA678', marginBottom: 4 },
+  title: { fontSize: 32, textAlign: 'center', color: BrandColors.primary, marginBottom: 4 },
   subtitle: { textAlign: 'center', marginBottom: 24, opacity: 0.6 },
   input: { marginBottom: 12 },
   button: { marginTop: 8, paddingVertical: 4 },
-  error: { color: '#F44336', textAlign: 'center', marginBottom: 8 },
+  error: { color: BrandColors.danger, textAlign: 'center', marginBottom: 8 },
   help: { textAlign: 'center', opacity: 0.5, fontSize: 12, marginTop: 16 },
 });
