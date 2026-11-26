@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { Card, Title, TextInput, Button, Paragraph } from 'react-native-paper';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import { apiFetch, getApiUrl, setApiUrl } from '@/api/client';
 import type { Setting } from '@/api/types';
 import { useToast } from '@/hooks/use-toast';
@@ -44,9 +45,11 @@ export default function SettingsScreen() {
       if (!res.ok) throw new Error('El servidor respondió con error');
       const data = await res.json();
       if (data.status !== 'ok') throw new Error('El servidor no está sano');
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       show('URL guardada y verificada correctamente');
       qc.invalidateQueries();
     } catch (err) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setApiUrlError(String(err instanceof Error ? err.message : err));
       show('Error al conectar con el servidor', 'error');
     } finally {
@@ -70,11 +73,15 @@ export default function SettingsScreen() {
         method: 'PUT',
         body: JSON.stringify({ value }),
       }),
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       qc.invalidateQueries({ queryKey: ['settings'] });
       show('Configuración guardada');
     },
-    onError: (err) => show(String(err.message), 'error'),
+    onError: async (err) => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      show(String(err.message), 'error');
+    },
   });
 
   return (
