@@ -86,6 +86,9 @@ export interface CimaSearchResult {
 export interface CimaSearchResponse {
   inventory: CimaSearchResult[]
   cima: CimaSearchResult[]
+  total_cima?: number
+  page?: number
+  page_size?: number
 }
 
 export interface CimaBarcodeResult {
