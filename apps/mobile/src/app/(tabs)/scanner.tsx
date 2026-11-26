@@ -1,19 +1,25 @@
 import { useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission, useCodeScanner } from 'react-native-vision-camera';
-import { Card, Button, Title, Paragraph, ActivityIndicator } from 'react-native-paper';
+import { Card, Button, Title, Paragraph, ActivityIndicator, IconButton } from 'react-native-paper';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import { apiFetch } from '@/api/client';
 import type { Medication, CimaSearchResult } from '@/api/types';
+import { useToast } from '@/hooks/use-toast';
+import { ToastSnackbar } from '@/components/ToastSnackbar';
+import { BrandColors } from '@/constants/theme';
 
 export default function ScannerScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const [scannedCode, setScannedCode] = useState<string | null>(null);
   const [searchResult, setSearchResult] = useState<CimaSearchResult | null>(null);
   const [searching, setSearching] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
   const device = useCameraDevice('back');
   const qc = useQueryClient();
   const isScanningRef = useRef(false);
+  const { toast, show, hide } = useToast();
 
   const searchByBarcode = async (barcode: string) => {
     setSearching(true);
@@ -21,6 +27,8 @@ export default function ScannerScreen() {
       const results = await apiFetch<CimaSearchResult[]>(`/cima/search?nombre=${encodeURIComponent(barcode)}`);
       if (results.length > 0) {
         setSearchResult(results[0]);
+      } else {
+        setSearchResult(null);
       }
     } catch {
       setSearchResult(null);
@@ -28,11 +36,12 @@ export default function ScannerScreen() {
     setSearching(false);
   };
 
-  const onCodeScanned = useCallback((codes: { value?: string }[]) => {
+  const onCodeScanned = useCallback(async (codes: { value?: string }[]) => {
     if (isScanningRef.current) return;
     for (const code of codes) {
       if (code.value) {
         isScanningRef.current = true;
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const value = code.value;
         setScannedCode(value);
         searchByBarcode(value);
@@ -54,8 +63,10 @@ export default function ScannerScreen() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['inventory'] });
+      show('Medicamento añadido al inventario');
       reset();
     },
+    onError: (err) => show(String(err.message), 'error'),
   });
 
   const reset = () => {
@@ -68,7 +79,7 @@ export default function ScannerScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.permissionText}>Se necesita permiso de cámara</Text>
-        <Button mode="contained" buttonColor="#0CA678" onPress={requestPermission}>
+        <Button mode="contained" buttonColor={BrandColors.primary} onPress={requestPermission}>
           Conceder permiso
         </Button>
       </View>
@@ -107,7 +118,7 @@ export default function ScannerScreen() {
             {searchResult && (
               <Button
                 mode="contained"
-                buttonColor="#0CA678"
+                buttonColor={BrandColors.primary}
                 loading={addMutation.isPending}
                 onPress={() => addMutation.mutate(searchResult.nregistro)}
               >
@@ -116,6 +127,7 @@ export default function ScannerScreen() {
             )}
           </Card.Actions>
         </Card>
+        <ToastSnackbar toast={toast} onDismiss={hide} />
       </View>
     );
   }
@@ -125,6 +137,7 @@ export default function ScannerScreen() {
       <Camera
         device={device}
         isActive={true}
+        torch={torchOn ? 'on' : 'off'}
         codeScanner={codeScanner}
         style={StyleSheet.absoluteFill}
       />
@@ -132,6 +145,17 @@ export default function ScannerScreen() {
         <View style={styles.scanFrame} />
         <Text style={styles.hint}>Escanea el código de barras del medicamento</Text>
       </View>
+      <Pressable
+        style={[styles.torchButton, torchOn && styles.torchButtonActive]}
+        onPress={() => setTorchOn((v) => !v)}
+      >
+        <IconButton
+          icon={torchOn ? 'flashlight' : 'flashlight-off'}
+          iconColor="#fff"
+          size={24}
+        />
+        <Text style={styles.torchLabel}>{torchOn ? 'ON' : 'OFF'}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -145,11 +169,23 @@ const styles = StyleSheet.create({
     width: 250,
     height: 150,
     borderWidth: 2,
-    borderColor: '#0CA678',
+    borderColor: BrandColors.primary,
     borderRadius: 12,
     backgroundColor: 'transparent',
   },
   hint: { color: '#fff', marginTop: 16, fontSize: 14 },
+  torchButton: {
+    position: 'absolute',
+    bottom: 32,
+    right: 24,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
+  torchButtonActive: { backgroundColor: BrandColors.primary },
+  torchLabel: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
   resultContainer: { flex: 1, padding: 16, justifyContent: 'center' },
   card: { marginBottom: 12 },
   code: { fontSize: 14, opacity: 0.6, marginTop: 4 },
@@ -157,5 +193,5 @@ const styles = StyleSheet.create({
   resultInfo: { marginTop: 12 },
   medName: { fontSize: 16 },
   lab: { opacity: 0.6, marginTop: 4 },
-  notFound: { color: '#F44336', marginTop: 8 },
+  notFound: { color: BrandColors.danger, marginTop: 8 },
 });
