@@ -188,7 +188,7 @@ msg_ok "Update script installed (run: update or apotheca-update)"
 
 # -- 7. Setup API (uv installs Python 3.12 automatically) --
 msg_info "Setting up API (uv will install Python 3.12)"
-pct exec "$CT_ID" -- bash -c 'export PATH="/root/.local/bin:$PATH"; cd '"${INSTALL_DIR}"'/apps/api; mkdir -p '"${DATA_DIR}"'; uv sync --no-dev; uv run alembic upgrade head' || msg_error "API setup failed. Check the output above."
+pct exec "$CT_ID" -- bash -c 'export PATH="/root/.local/bin:$PATH"; cd '"${INSTALL_DIR}"'/apps/api; mkdir -p '"${DATA_DIR}"'; uv sync --no-dev; APOTHECA_DATABASE_PATH='"${DATA_DIR}"'/apotheca.db uv run alembic upgrade head' || msg_error "API setup failed. Check the output above."
 msg_ok "API ready"
 
 # -- 8. Build web frontend --

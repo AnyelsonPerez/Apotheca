@@ -105,7 +105,7 @@ msg_ok "Dependencies synced"
 
 # -- 3. Run database migrations --
 msg_info "Running database migrations"
-uv run alembic upgrade head
+APOTHECA_DATABASE_PATH="$DATA_DIR/apotheca.db" uv run alembic upgrade head
 msg_ok "Migrations complete"
 
 # -- 4. Rebuild web frontend --
