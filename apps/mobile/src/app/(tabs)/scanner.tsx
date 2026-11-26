@@ -4,16 +4,18 @@ import { Camera, useCameraDevice, useCameraPermission, useCodeScanner } from 're
 import { Card, Button, Title, Paragraph, ActivityIndicator, IconButton } from 'react-native-paper';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import { apiFetch } from '@/api/client';
-import type { Medication, CimaSearchResult } from '@/api/types';
+import type { Medication, CimaBarcodeResult } from '@/api/types';
 import { useToast } from '@/hooks/use-toast';
 import { ToastSnackbar } from '@/components/ToastSnackbar';
 import { BrandColors } from '@/constants/theme';
 
 export default function ScannerScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
+  const router = useRouter();
   const [scannedCode, setScannedCode] = useState<string | null>(null);
-  const [searchResult, setSearchResult] = useState<CimaSearchResult | null>(null);
+  const [searchResult, setSearchResult] = useState<CimaBarcodeResult | null>(null);
   const [searching, setSearching] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const device = useCameraDevice('back');
@@ -24,12 +26,8 @@ export default function ScannerScreen() {
   const searchByBarcode = async (barcode: string) => {
     setSearching(true);
     try {
-      const results = await apiFetch<CimaSearchResult[]>(`/cima/search?nombre=${encodeURIComponent(barcode)}`);
-      if (results.length > 0) {
-        setSearchResult(results[0]);
-      } else {
-        setSearchResult(null);
-      }
+      const result = await apiFetch<CimaBarcodeResult>(`/cima/barcode/${encodeURIComponent(barcode)}`);
+      setSearchResult(result);
     } catch {
       setSearchResult(null);
     }
@@ -61,12 +59,16 @@ export default function ScannerScreen() {
         method: 'POST',
         body: JSON.stringify({ nregistro }),
       }),
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       qc.invalidateQueries({ queryKey: ['inventory'] });
       show('Medicamento añadido al inventario');
       reset();
     },
-    onError: (err) => show(String(err.message), 'error'),
+    onError: async (err) => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      show(String(err.message), 'error');
+    },
   });
 
   const reset = () => {
@@ -110,7 +112,17 @@ export default function ScannerScreen() {
               </View>
             )}
             {!searching && !searchResult && (
-              <Paragraph style={styles.notFound}>No se encontró el medicamento en CIMA</Paragraph>
+              <View>
+                <Paragraph style={styles.notFound}>No se encontró el medicamento en CIMA</Paragraph>
+                <Button
+                  mode="outlined"
+                  textColor={BrandColors.primary}
+                  onPress={() => { reset(); router.push('/(tabs)/search'); }}
+                  style={styles.manualButton}
+                >
+                  Buscar manualmente
+                </Button>
+              </View>
             )}
           </Card.Content>
           <Card.Actions>
@@ -145,17 +157,27 @@ export default function ScannerScreen() {
         <View style={styles.scanFrame} />
         <Text style={styles.hint}>Escanea el código de barras del medicamento</Text>
       </View>
-      <Pressable
-        style={[styles.torchButton, torchOn && styles.torchButtonActive]}
-        onPress={() => setTorchOn((v) => !v)}
-      >
-        <IconButton
-          icon={torchOn ? 'flashlight' : 'flashlight-off'}
-          iconColor="#fff"
-          size={24}
-        />
-        <Text style={styles.torchLabel}>{torchOn ? 'ON' : 'OFF'}</Text>
-      </Pressable>
+      <View style={styles.bottomBar}>
+        <Pressable
+          style={[styles.torchButton, torchOn && styles.torchButtonActive]}
+          onPress={() => setTorchOn((v) => !v)}
+        >
+          <IconButton
+            icon={torchOn ? 'flashlight' : 'flashlight-off'}
+            iconColor="#fff"
+            size={24}
+          />
+          <Text style={styles.torchLabel}>{torchOn ? 'ON' : 'OFF'}</Text>
+        </Pressable>
+        <Pressable
+          style={styles.manualSearchButton}
+          onPress={() => router.push('/(tabs)/search')}
+        >
+          <IconButton icon="magnify" iconColor="#fff" size={22} />
+          <Text style={styles.manualSearchLabel}>Búsqueda manual</Text>
+        </Pressable>
+      </View>
+      <ToastSnackbar toast={toast} onDismiss={hide} />
     </View>
   );
 }
@@ -174,10 +196,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   hint: { color: '#fff', marginTop: 16, fontSize: 14 },
-  torchButton: {
+  bottomBar: {
     position: 'absolute',
     bottom: 32,
+    left: 24,
     right: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  torchButton: {
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 28,
     paddingHorizontal: 8,
@@ -186,6 +214,15 @@ const styles = StyleSheet.create({
   },
   torchButtonActive: { backgroundColor: BrandColors.primary },
   torchLabel: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  manualSearchButton: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  manualSearchLabel: { color: '#fff', fontSize: 12, fontWeight: 'bold', marginRight: 4 },
   resultContainer: { flex: 1, padding: 16, justifyContent: 'center' },
   card: { marginBottom: 12 },
   code: { fontSize: 14, opacity: 0.6, marginTop: 4 },
@@ -194,4 +231,5 @@ const styles = StyleSheet.create({
   medName: { fontSize: 16 },
   lab: { opacity: 0.6, marginTop: 4 },
   notFound: { color: BrandColors.danger, marginTop: 8 },
+  manualButton: { marginTop: 12 },
 });
