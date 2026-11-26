@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { View, Text, StyleSheet, FlatList, Pressable, Alert } from 'react-native';
 import { Card, Title, Paragraph, IconButton, ActivityIndicator } from 'react-native-paper';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { apiFetch } from '@/api/client';
 import type { AlertsResponse, InventoryItem, AlertItem } from '@/api/types';
 import { useAuth } from '@/context/AuthContext';
@@ -36,6 +37,11 @@ export default function HomeScreen() {
         { text: 'Cerrar sesión', style: 'destructive', onPress: () => logout() },
       ],
     );
+  };
+
+  const handleAlertPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(tabs)/inventory');
   };
 
   const renderAlertCard = ({ item, type }: { item: AlertItem; type: 'expiry' | 'depletion' }) => {
@@ -123,7 +129,11 @@ export default function HomeScreen() {
     listData.push(
       <View key="expiry-section">
         <Text style={styles.sectionTitle}> Caducidades ({expiryAlerts.length})</Text>
-        {expiryAlerts.map((item) => renderAlertCard({ item, type: 'expiry' }))}
+        {expiryAlerts.map((item) => (
+          <Pressable key={item.lot_id} onPress={handleAlertPress}>
+            {renderAlertCard({ item, type: 'expiry' })}
+          </Pressable>
+        ))}
       </View>,
     );
   }
@@ -133,7 +143,11 @@ export default function HomeScreen() {
     listData.push(
       <View key="depletion-section">
         <Text style={styles.sectionTitle}> Agotamiento ({depletionAlerts.length})</Text>
-        {depletionAlerts.map((item) => renderAlertCard({ item, type: 'depletion' }))}
+        {depletionAlerts.map((item) => (
+          <Pressable key={item.lot_id} onPress={handleAlertPress}>
+            {renderAlertCard({ item, type: 'depletion' })}
+          </Pressable>
+        ))}
       </View>,
     );
   }
@@ -150,7 +164,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Apotheca</Text>
-            {user && <Text style={styles.welcome}>Hola, {user.name}</Text>}
+            {user && <Text style={styles.welcome} numberOfLines={1}>Hola, {user.name}</Text>}
           </View>
           <IconButton icon="logout" iconColor={BrandColors.danger} onPress={handleLogout} />
         </View>
