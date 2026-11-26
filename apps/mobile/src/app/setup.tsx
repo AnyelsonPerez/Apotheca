@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { TextInput, Button, Text, Title, useTheme } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { getApiUrl, setApiUrl } from '@/api/client';
+import { getStoredApiUrl, getApiUrl, setApiUrl } from '@/api/client';
 import { BrandColors } from '@/constants/theme';
 
 export default function SetupScreen() {
@@ -11,6 +11,15 @@ export default function SetupScreen() {
   const [url, setUrl] = useState('');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
+  const userEdited = useRef(false);
+
+  useEffect(() => {
+    getStoredApiUrl().then((stored) => {
+      if (stored && !userEdited.current) {
+        setUrl(stored.replace(/\/api$/i, ''));
+      }
+    }).catch(() => {});
+  }, []);
 
   const urlValid = /^https?:\/\/.+/i.test(url.trim());
 
@@ -45,7 +54,7 @@ export default function SetupScreen() {
         <TextInput
           label="URL del servidor (http://IP_O_HOST)"
           value={url}
-          onChangeText={(t) => { setUrl(t); setError(''); }}
+          onChangeText={(t) => { userEdited.current = true; setUrl(t); setError(''); }}
           mode="outlined"
           autoCapitalize="none"
           autoCorrect={false}

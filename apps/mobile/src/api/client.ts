@@ -46,6 +46,13 @@ export async function hasServerUrl(): Promise<boolean> {
   return stored !== null && stored.length > 0
 }
 
+/** Returns the stored API URL (normalised) or null if the user hasn't set one. */
+export async function getStoredApiUrl(): Promise<string | null> {
+  const stored = await AsyncStorage.getItem(API_URL_KEY)
+  if (!stored) return null
+  return normaliseApiUrl(stored)
+}
+
 export function clearApiUrl(): void {
   cachedApiUrl = null
   AsyncStorage.removeItem(API_URL_KEY)

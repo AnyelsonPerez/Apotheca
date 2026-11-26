@@ -6,10 +6,12 @@ import { apiFetch, setTokens } from '@/api/client';
 import type { TokenResponse } from '@/api/types';
 import { useAuth } from '@/context/AuthContext';
 import { BrandColors } from '@/constants/theme';
+import { useRouter } from 'expo-router';
 
 export default function LoginScreen() {
   const theme = useTheme();
   const { login } = useAuth();
+  const router = useRouter();
   const [mode, setMode] = useState<'login' | 'register' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -247,6 +249,14 @@ export default function LoginScreen() {
               Volver a inicio de sesión
             </Button>
           )}
+
+          <Button
+            mode="text"
+            onPress={() => router.push('/setup')}
+            textColor={BrandColors.primary}
+          >
+            Cambiar servidor
+          </Button>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
