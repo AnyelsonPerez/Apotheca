@@ -17,6 +17,8 @@ const labels: Record<string, string> = {
   ntfy_url: 'URL de ntfy',
 };
 
+const NUMERIC_KEYS = new Set(['expiry_warning_days', 'depletion_threshold_days']);
+
 export default function SettingsScreen() {
   const qc = useQueryClient();
   const { data: settings, isLoading, isError, refetch } = useQuery({
@@ -28,6 +30,7 @@ export default function SettingsScreen() {
   const [apiUrl, setApiUrlState] = useState('');
   const [apiUrlError, setApiUrlError] = useState('');
   const [checkingUrl, setCheckingUrl] = useState(false);
+  const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const { toast, show, hide } = useToast();
   const settingsKey = settings?.map((s) => `${s.key}:${s.value}`).join('|') ?? '';
 
@@ -77,12 +80,23 @@ export default function SettingsScreen() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       qc.invalidateQueries({ queryKey: ['settings'] });
       show('Configuración guardada');
+      setUpdatingKey(null);
     },
     onError: async (err) => {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       show(String(err.message), 'error');
+      setUpdatingKey(null);
     },
   });
+
+  const handleSaveSetting = (key: string, value: string) => {
+    if (NUMERIC_KEYS.has(key) && value !== '' && !/^\d+$/.test(value)) {
+      show('El valor debe ser un número entero', 'error');
+      return;
+    }
+    setUpdatingKey(key);
+    updateMutation.mutate({ key, value });
+  };
 
   return (
     <>
@@ -106,7 +120,7 @@ export default function SettingsScreen() {
               buttonColor={BrandColors.primary}
               onPress={saveApiUrl}
               loading={checkingUrl}
-              disabled={!apiUrl.trim() || apiUrl.trim() === ''}
+              disabled={!apiUrl.trim()}
               style={styles.input}
             >
               Guardar y verificar URL
@@ -130,25 +144,32 @@ export default function SettingsScreen() {
             {isError && !settings && (
               <ErrorView message="No se pudieron cargar los ajustes" onRetry={() => refetch()} />
             )}
-            {settings?.map((s) => (
-              <View key={s.key} style={styles.row}>
-                <TextInput
-                  label={labels[s.key] ?? s.key}
-                  value={values[s.key] ?? ''}
-                  onChangeText={(text) => setValues({ ...values, [s.key]: text })}
-                  mode="outlined"
-                  style={styles.input}
-                />
-                <Button
-                  mode="contained"
-                  buttonColor={BrandColors.primary}
-                  onPress={() => updateMutation.mutate({ key: s.key, value: values[s.key] ?? '' })}
-                  loading={updateMutation.isPending}
-                >
-                  Guardar
-                </Button>
-              </View>
-            ))}
+            {settings?.map((s) => {
+              const isNumeric = NUMERIC_KEYS.has(s.key);
+              const valueInvalid = isNumeric && values[s.key] !== '' && values[s.key] !== undefined && !/^\d+$/.test(values[s.key] ?? '');
+              return (
+                <View key={s.key} style={styles.row}>
+                  <TextInput
+                    label={labels[s.key] ?? s.key}
+                    value={values[s.key] ?? ''}
+                    onChangeText={(text) => setValues({ ...values, [s.key]: text })}
+                    mode="outlined"
+                    keyboardType={isNumeric ? 'numeric' : 'default'}
+                    error={valueInvalid}
+                    style={styles.input}
+                  />
+                  <Button
+                    mode="contained"
+                    buttonColor={BrandColors.primary}
+                    onPress={() => handleSaveSetting(s.key, values[s.key] ?? '')}
+                    loading={updatingKey === s.key}
+                    disabled={valueInvalid}
+                  >
+                    Guardar
+                  </Button>
+                </View>
+              );
+            })}
           </Card.Content>
         </Card>
       </ScrollView>
