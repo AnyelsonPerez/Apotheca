@@ -183,7 +183,7 @@ msg_ok "Repository cloned"
 
 # -- 7. Setup API (uv installs Python 3.12 automatically) --
 msg_info "Setting up API (uv will install Python 3.12)"
-pct exec "$CT_ID" -- bash -c 'export PATH="/root/.local/bin:$PATH"; cd '"${INSTALL_DIR}"'/apps/api; mkdir -p '"${DATA_DIR}"'; uv sync --no-dev; uv run alembic upgrade head'
+pct exec "$CT_ID" -- bash -c 'export PATH="/root/.local/bin:$PATH"; cd '"${INSTALL_DIR}"'/apps/api; mkdir -p '"${DATA_DIR}"'; uv sync --no-dev; uv run alembic upgrade head' || msg_error "API setup failed. Check the output above."
 msg_ok "API ready"
 
 # -- 8. Build web frontend --
@@ -198,30 +198,41 @@ msg_ok "APK downloaded"
 
 # -- 9. Configure nginx (copy from repo, validate before restart) --
 msg_info "Configuring nginx"
-pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/nginx-apotheca.conf /etc/nginx/sites-available/apotheca && ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca && rm -f /etc/nginx/sites-enabled/default && nginx -t && systemctl restart nginx" || msg_error "nginx config validation failed. Check: pct exec ${CT_ID} -- nginx -t"
-msg_ok "nginx configured"
+pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/nginx-apotheca.conf /etc/nginx/sites-available/apotheca && ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca && rm -f /etc/nginx/sites-enabled/default && nginx -t 2>&1 && systemctl restart nginx" || msg_error "nginx config validation failed. Check: pct exec ${CT_ID} -- nginx -t"
+msg_ok "nginx configured (listening on port 49200)"
 
 # -- 9b. Install update script --
 msg_info "Installing update script"
 pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/update.sh ${INSTALL_DIR}/update.sh && chmod +x ${INSTALL_DIR}/update.sh && ln -sf ${INSTALL_DIR}/update.sh /usr/local/bin/apotheca-update && ln -sf ${INSTALL_DIR}/update.sh /usr/local/bin/update"
 msg_ok "Update script installed (run: update or apotheca-update)"
 
-# -- 10. Create systemd service (copy from repo, no heredoc needed) --
+# -- 10. Create systemd service (copy from repo, verify it started) --
 msg_info "Creating systemd service"
 pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/apotheca-api.service /etc/systemd/system/apotheca-api.service && systemctl daemon-reload && systemctl enable -q apotheca-api && systemctl start apotheca-api"
-msg_ok "Service created and started"
+sleep 2
+# Verify the service is actually running, not just started
+if ! pct exec "$CT_ID" -- bash -c "systemctl is-active --quiet apotheca-api" 2>/dev/null; then
+  pct exec "$CT_ID" -- bash -c "journalctl -u apotheca-api -n 20 --no-pager" 2>/dev/null || true
+  msg_error "apotheca-api service failed to start. Check: pct exec ${CT_ID} -- journalctl -u apotheca-api -n 50"
+fi
+msg_ok "API service created and running (uvicorn on 127.0.0.1:8000, proxied via nginx :49200)"
 
-# -- 11. Health check --
-msg_info "Waiting for API health check"
+# -- 11. Health check (through nginx on port 49200, the way clients access it) --
+msg_info "Waiting for API health check (port 49200/api/health)"
 for i in $(seq 1 30); do
-  if pct exec "$CT_ID" -- bash -c "curl -sf http://localhost:8000/api/health" 2>/dev/null; then
+  if pct exec "$CT_ID" -- bash -c "curl -sf http://localhost:49200/api/health" 2>/dev/null; then
     echo ""
-    msg_ok "API is healthy!"
+    msg_ok "API is healthy and reachable through nginx on port 49200!"
     break
   fi
   printf "."
   sleep 2
 done
+
+# Verify nginx is actually listening on 49200
+if ! pct exec "$CT_ID" -- bash -c "ss -tlnp | grep -q ':49200'" 2>/dev/null; then
+  msg_error "nginx is not listening on port 49200. Check: pct exec ${CT_ID} -- nginx -t && systemctl status nginx"
+fi
 
 # -- Done --
 if [[ "$CT_IP" == "dhcp" ]]; then

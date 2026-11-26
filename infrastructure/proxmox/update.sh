@@ -121,11 +121,11 @@ msg_info "Restarting API service"
 systemctl restart apotheca-api 2>/dev/null || systemctl start apotheca-api
 msg_ok "API restarted"
 
-# -- 7. Health check --
-msg_info "Health check"
+# -- 7. Health check (through nginx on port 49200) --
+msg_info "Health check (port 49200/api/health)"
 for i in $(seq 1 15); do
-  if curl -sf http://localhost:8000/api/health >/dev/null 2>&1; then
-    msg_ok "API is healthy!"
+  if curl -sf http://localhost:49200/api/health >/dev/null 2>&1; then
+    msg_ok "API is healthy and reachable through nginx on port 49200!"
     echo ""
     echo -e " ${GN}Apotheca updated successfully!${CL}"
     exit 0
@@ -135,4 +135,5 @@ for i in $(seq 1 15); do
 done
 
 echo ""
-msg_error "API health check failed. Check logs: journalctl -u apotheca-api -n 50"
+# Diagnostic: show what's listening
+msg_error "Health check failed. Listening ports:\n$(ss -tlnp 2>/dev/null || true)\nCheck logs: journalctl -u apotheca-api -n 50 && nginx -t"
