@@ -49,11 +49,17 @@ self_repair() {
   msg_ok "systemd service synced"
 
   # auto-login on console
-  if [ ! -f /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf ]; then
+  if [ ! -f /etc/systemd/system/container-getty@.service.d/override.conf ]; then
     msg_info "Enabling console auto-login"
-    mkdir -p /etc/systemd/system/serial-getty@tty1.service.d
-    printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear %%I \$TERM\n" > /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf
+    passwd -d root 2>/dev/null || true
+    mkdir -p /etc/systemd/system/container-getty@.service.d
+    printf "[Service]\nEnvironment=TERM=linux\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noissue --keep-baud - 115200,38400,9600 linux\n" > /etc/systemd/system/container-getty@.service.d/override.conf
+    mkdir -p /etc/systemd/system/console-getty.service.d
+    printf "[Service]\nEnvironment=TERM=linux\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noissue --keep-baud - 115200,38400,9600 linux\n" > /etc/systemd/system/console-getty.service.d/override.conf
+    touch /root/.hushlogin
     systemctl daemon-reload
+    systemctl restart container-getty@1.service 2>/dev/null || true
+    systemctl restart console-getty.service 2>/dev/null || true
     msg_ok "Console auto-login enabled"
   fi
 }

@@ -150,7 +150,25 @@ msg_ok "Dependencies installed"
 
 # -- 4b. Enable auto-login on console (so LXC console doesn't ask for password) --
 msg_info "Enabling console auto-login"
-pct exec "$CT_ID" -- bash -c 'mkdir -p /etc/systemd/system/serial-getty@tty1.service.d && printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear %%I \$TERM\n" > /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf && systemctl daemon-reload' || true
+pct exec "$CT_ID" -- bash -c '
+  # Remove root password so console login works without credentials
+  passwd -d root 2>/dev/null || true
+
+  # In LXC the Proxmox noVNC console uses container-getty@ (-> /dev/pts/1)
+  # and pct console uses console-getty (-> /dev/console).
+  # serial-getty@tty1 is kept as fallback.
+  # Configure all three with --autologin root so neither asks for a password.
+  mkdir -p /etc/systemd/system/container-getty@.service.d
+  printf "[Service]\nEnvironment=TERM=linux\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noissue --keep-baud - 115200,38400,9600 linux\n" > /etc/systemd/system/container-getty@.service.d/override.conf
+  mkdir -p /etc/systemd/system/console-getty.service.d
+  printf "[Service]\nEnvironment=TERM=linux\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noissue --keep-baud - 115200,38400,9600 linux\n" > /etc/systemd/system/console-getty.service.d/override.conf
+  mkdir -p /etc/systemd/system/serial-getty@tty1.service.d
+  printf "[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear %%I \$TERM\n" > /etc/systemd/system/serial-getty@tty1.service.d/autologin.conf
+  touch /root/.hushlogin
+  systemctl daemon-reload
+  systemctl restart container-getty@1.service 2>/dev/null || true
+  systemctl restart console-getty.service 2>/dev/null || true
+' || true
 msg_ok "Console auto-login enabled"
 
 # -- 5. Install uv (manages Python 3.12 itself, no deadsnakes needed) --
