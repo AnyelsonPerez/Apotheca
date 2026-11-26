@@ -95,6 +95,18 @@ export default function LoginScreen() {
     ? emailValid && (!resetSent || (resetToken.trim().length > 0 && newPassword.length >= 8))
     : emailValid && passwordValid && (mode !== 'register' || name.trim().length > 0)
 
+  const switchMode = (newMode: 'login' | 'register' | 'reset') => {
+    setMode(newMode);
+    setError('');
+    setEmail('');
+    setPassword('');
+    setName('');
+    setResetToken('');
+    setNewPassword('');
+    setResetSent(false);
+    setResetDone(false);
+  };
+
   const getTitle = () => {
     if (mode === 'login') return 'Inicia sesión'
     if (mode === 'register') return 'Crea tu cuenta'
@@ -215,12 +227,7 @@ export default function LoginScreen() {
 
           <Button
             mode="text"
-            onPress={() => {
-              setMode(mode === 'login' ? 'register' : 'login')
-              setError('')
-              setResetSent(false)
-              setResetDone(false)
-            }}
+            onPress={() => switchMode(mode === 'login' ? 'register' : 'login')}
           >
             {mode === 'login' ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}
           </Button>
@@ -228,12 +235,7 @@ export default function LoginScreen() {
           {mode === 'login' && (
             <Button
               mode="text"
-              onPress={() => {
-                setMode('reset')
-                setError('')
-                setResetSent(false)
-                setResetDone(false)
-              }}
+              onPress={() => switchMode('reset')}
               textColor={BrandColors.primary}
             >
               ¿Olvidaste tu contraseña?
@@ -241,7 +243,7 @@ export default function LoginScreen() {
           )}
 
           {mode === 'reset' && (
-            <Button mode="text" onPress={() => { setMode('login'); setError('') }}>
+            <Button mode="text" onPress={() => switchMode('login')}>
               Volver a inicio de sesión
             </Button>
           )}
