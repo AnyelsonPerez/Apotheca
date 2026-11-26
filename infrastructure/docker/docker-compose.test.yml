@@ -1,0 +1,17 @@
+# Ephemeral Docker Compose override for E2E testing.
+# Inherits from docker-compose.yml but removes persistent volumes
+# so no test data survives after `docker compose down -v`.
+
+services:
+  api:
+    # Override: no persistent volume, ephemeral DB
+    volumes: []
+    environment:
+      - APOTHECA_DATABASE_PATH=/tmp/apotheca-test.db
+      - APOTHECA_JWT_SECRET=e2e-test-secret-32bytes-changeme!!  # 32+ bytes
+      - APOTHECA_DEBUG=true
+
+  web:
+    depends_on:
+      - api
+    restart: "no"
