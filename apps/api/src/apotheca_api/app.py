@@ -5,13 +5,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from apotheca_api.database import Base, engine, get_db
+from apotheca_api.database import get_db
 from apotheca_api.routers import alerts, auth, cima, inventory, settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
     from apotheca_api.seed import seed_settings
     db = next(get_db())
     try:
