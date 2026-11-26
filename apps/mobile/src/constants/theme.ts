@@ -24,6 +24,17 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+/** Brand colors used across the app (not tied to light/dark mode). */
+export const BrandColors = {
+  primary: '#0CA678',
+  primaryDark: '#097d5b',
+  warning: '#FF9800',
+  danger: '#F44336',
+  success: '#4CAF50',
+  lightText: '#666666',
+  darkText: '#999999',
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */
