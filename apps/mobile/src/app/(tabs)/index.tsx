@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, Pressable, Alert } from 'react-native
 import { Card, Title, Paragraph, IconButton, ActivityIndicator } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useCallback } from 'react';
 import { apiFetch } from '@/api/client';
 import type { AlertsResponse, InventoryItem, AlertItem } from '@/api/types';
 import { useAuth } from '@/context/AuthContext';
@@ -28,7 +29,7 @@ export default function HomeScreen() {
   const expiryAlerts = alerts?.expiry ?? [];
   const depletionAlerts = alerts?.depletion ?? [];
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     Alert.alert(
       'Cerrar sesión',
       '¿Seguro que quieres cerrar la sesión?',
@@ -37,7 +38,17 @@ export default function HomeScreen() {
         { text: 'Cerrar sesión', style: 'destructive', onPress: () => logout() },
       ],
     );
-  };
+  }, [logout]);
+
+  const header = useCallback(() => (
+    <View style={styles.header}>
+      <View>
+        <Text style={styles.title}>Apotheca</Text>
+        {user && <Text style={styles.welcome} numberOfLines={1}>Hola, {user.name}</Text>}
+      </View>
+      <IconButton icon="logout" iconColor={BrandColors.danger} onPress={handleLogout} />
+    </View>
+  ), [user, handleLogout]);
 
   const handleAlertPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -160,15 +171,7 @@ export default function HomeScreen() {
       renderItem={({ item }) => <>{item}</>}
       refreshing={refreshing}
       onRefresh={() => { refetchInv(); refetchAlerts(); }}
-      ListHeaderComponent={
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>Apotheca</Text>
-            {user && <Text style={styles.welcome} numberOfLines={1}>Hola, {user.name}</Text>}
-          </View>
-          <IconButton icon="logout" iconColor={BrandColors.danger} onPress={handleLogout} />
-        </View>
-      }
+      ListHeaderComponent={header}
       ListEmptyComponent={
         !invLoading && totalMeds > 0 && expiryAlerts.length === 0 && depletionAlerts.length === 0 ? (
           <Card style={styles.card}>
