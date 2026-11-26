@@ -1,10 +1,10 @@
 import { useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Linking, Alert } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission, useCodeScanner } from 'react-native-vision-camera';
 import { Card, Button, Title, Paragraph, ActivityIndicator, IconButton } from 'react-native-paper';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
 import { apiFetch } from '@/api/client';
 import type { Medication, CimaBarcodeResult } from '@/api/types';
 import { useToast } from '@/hooks/use-toast';
@@ -18,18 +18,30 @@ export default function ScannerScreen() {
   const [searchResult, setSearchResult] = useState<CimaBarcodeResult | null>(null);
   const [searching, setSearching] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  const [permissionRequested, setPermissionRequested] = useState(false);
   const device = useCameraDevice('back');
   const qc = useQueryClient();
   const isScanningRef = useRef(false);
   const { toast, show, hide } = useToast();
+
+  useFocusEffect(
+    useCallback(() => {
+      setScannedCode(null);
+      setSearchResult(null);
+      isScanningRef.current = false;
+    }, []),
+  );
 
   const searchByBarcode = async (barcode: string) => {
     setSearching(true);
     try {
       const result = await apiFetch<CimaBarcodeResult>(`/cima/barcode/${encodeURIComponent(barcode)}`);
       setSearchResult(result);
-    } catch {
+    } catch (err) {
       setSearchResult(null);
+      if (String(err).includes('404')) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
     }
     setSearching(false);
   };
@@ -77,13 +89,37 @@ export default function ScannerScreen() {
     isScanningRef.current = false;
   };
 
+  const handleRequestPermission = async () => {
+    setPermissionRequested(true);
+    const granted = await requestPermission();
+    if (!granted && permissionRequested) {
+      Alert.alert(
+        'Permiso de cámara denegado',
+        'Has denegado el permiso de cámara permanentemente. Habilítalo en los ajustes del sistema para usar el escáner.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Abrir ajustes', onPress: () => Linking.openSettings() },
+        ],
+      );
+    }
+  };
+
   if (!hasPermission) {
     return (
       <View style={styles.center}>
-        <Text style={styles.permissionText}>Se necesita permiso de cámara</Text>
-        <Button mode="contained" buttonColor={BrandColors.primary} onPress={requestPermission}>
-          Conceder permiso
+        <Text style={styles.permissionText}>
+          {permissionRequested
+            ? 'Permiso de cámara denegado. Habilítalo en los ajustes del sistema.'
+            : 'Se necesita permiso de cámara'}
+        </Text>
+        <Button mode="contained" buttonColor={BrandColors.primary} onPress={handleRequestPermission}>
+          {permissionRequested ? 'Abrir ajustes' : 'Conceder permiso'}
         </Button>
+        {permissionRequested && (
+          <Button mode="text" textColor={BrandColors.primary} onPress={() => Linking.openSettings()}>
+            Ir a ajustes del sistema
+          </Button>
+        )}
       </View>
     );
   }
