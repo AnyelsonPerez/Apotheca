@@ -28,8 +28,8 @@ msg_ok()   { echo -e " ${GN}[OK]${CL}   ${1}"; }
 msg_error(){ echo -e " ${RD}[ERROR]${CL} ${1}"; exit 1; }
 
 # -- Ensure this script is callable as 'apotheca-update' / 'update' --
-chmod +x "$INSTALL_DIR/infrastructure/proxmox/update.sh" 2>/dev/null || true
 if [ "$(command -v apotheca-update 2>/dev/null)" != "$INSTALL_DIR/update.sh" ]; then
+  chmod +x "$INSTALL_DIR/update.sh" 2>/dev/null || true
   ln -sf "$INSTALL_DIR/update.sh" /usr/local/bin/apotheca-update 2>/dev/null || true
   ln -sf "$INSTALL_DIR/update.sh" /usr/local/bin/update 2>/dev/null || true
 fi
@@ -92,6 +92,7 @@ msg_ok "Update available! Updating from ${LOCAL:0:7} to ${REMOTE:0:7}"
 
 # -- 1. Pull latest code --
 msg_info "Pulling latest code"
+git checkout -q -- .
 git pull -q origin main
 msg_ok "Code updated"
 
