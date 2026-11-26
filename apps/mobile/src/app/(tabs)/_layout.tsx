@@ -1,11 +1,12 @@
 import { Tabs } from 'expo-router';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { BrandColors } from '@/constants/theme';
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#0CA678',
+        tabBarActiveTintColor: BrandColors.primary,
         headerShown: true,
       }}
     >
