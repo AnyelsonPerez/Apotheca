@@ -190,15 +190,16 @@ export default function InventoryScreen() {
                   <TextInput
                     label="Cantidad"
                     value={quantity}
-                    onChangeText={setQuantity}
+                    onChangeText={(t) => setQuantity(t.replace(/[^0-9]/g, ''))}
                     mode="outlined"
                     keyboardType="numeric"
+                    error={quantity !== '' && (Number(quantity) < 0 || !/^\d+$/.test(quantity))}
                     style={styles.input}
                   />
                   <TextInput
                     label="Dosis diaria (opcional)"
                     value={dailyDose}
-                    onChangeText={setDailyDose}
+                    onChangeText={(t) => setDailyDose(t.replace(/[^0-9.]/g, ''))}
                     mode="outlined"
                     keyboardType="numeric"
                     placeholder="Ej: 2 (comprimidos al día)"
@@ -247,7 +248,7 @@ export default function InventoryScreen() {
                     mode="contained"
                     buttonColor={BrandColors.primary}
                     loading={createLot.isPending}
-                    disabled={!quantity.trim()}
+                    disabled={!quantity.trim() || Number(quantity) <= 0}
                     onPress={() => createLot.mutate()}
                   >
                     Guardar
