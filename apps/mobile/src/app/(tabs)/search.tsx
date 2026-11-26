@@ -13,6 +13,10 @@ import { BrandColors } from '@/constants/theme';
 
 const PAGE_SIZE = 25;
 
+interface MergedResult extends CimaSearchResult {
+  source: 'inventory' | 'cima';
+}
+
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [searchType, setSearchType] = useState<'name' | 'active'>('name');
@@ -32,23 +36,48 @@ export default function SearchScreen() {
     enabled: debouncedQuery.length >= 2,
   });
 
-  // Derive deduplicated merged results from the query response
-  const results = useMemo(() => {
-    if (!searchResponse) return [];
-    const merged = [
-      ...(searchResponse.inventory ?? []),
-      ...(searchResponse.cima ?? []),
-    ];
-    const seen = new Set<string>();
-    const deduped: CimaSearchResult[] = [];
-    for (const item of merged) {
-      if (!seen.has(item.nregistro)) {
-        seen.add(item.nregistro);
-        deduped.push(item);
-      }
+  // Accumulate results from all loaded pages, deduplicated by nregistro
+  const [results, setResults] = useState<MergedResult[]>([]);
+  const queryKey = `${searchType}:${debouncedQuery}`;
+
+  useEffect(() => {
+    if (!searchResponse) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setResults([]);
+      return;
     }
-    return deduped;
-  }, [searchResponse]);
+
+    const newItems: MergedResult[] = [
+      ...(searchResponse.inventory ?? []).map((m) => ({ ...m, source: 'inventory' as const })),
+      ...(searchResponse.cima ?? []).map((m) => ({ ...m, source: 'cima' as const })),
+    ];
+
+    if (page === 1) {
+      setResults(newItems);
+    } else {
+      setResults((prev) => {
+        const seen = new Set(prev.map((r) => r.nregistro));
+        const merged = [...prev];
+        for (const item of newItems) {
+          if (!seen.has(item.nregistro)) {
+            merged.push(item);
+            seen.add(item.nregistro);
+          }
+        }
+        return merged;
+      });
+    }
+  }, [searchResponse, page, searchType, debouncedQuery]);
+
+  // Reset page when query or type changes
+  const prevQueryKey = useRef(queryKey);
+  useEffect(() => {
+    if (prevQueryKey.current !== queryKey) {
+      prevQueryKey.current = queryKey;
+      setPage(1);
+      setResults([]);
+    }
+  }, [queryKey]);
 
   const hasMore = useMemo(() => {
     if (!searchResponse) return false;
@@ -61,6 +90,7 @@ export default function SearchScreen() {
     setSearchType(type);
     setQuery('');
     setPage(1);
+    setResults([]);
   }, []);
 
   const loadMore = useCallback(() => {
@@ -85,16 +115,6 @@ export default function SearchScreen() {
       show(String(err.message), 'error');
     },
   });
-
-  // Reset page when query or type changes
-  const queryKey = `${searchType}:${debouncedQuery}`;
-  const prevQueryKey = useRef(queryKey);
-  useEffect(() => {
-    if (prevQueryKey.current !== queryKey) {
-      prevQueryKey.current = queryKey;
-      setPage(1);
-    }
-  }, [queryKey]);
 
   return (
     <View style={styles.container}>
@@ -140,8 +160,12 @@ export default function SearchScreen() {
                     {item.cpresc && item.cpresc !== 'Sin Receta' && (
                       <Chip mode="outlined" style={[styles.chip, styles.prescChip]}>Con receta</Chip>
                     )}
-                    {alreadyAdded && (
+                    {alreadyAdded ? (
                       <Chip mode="outlined" style={[styles.chip, styles.addedChip]} textStyle={styles.addedChipText}>En inventario</Chip>
+                    ) : item.source === 'inventory' ? (
+                      <Chip mode="outlined" style={[styles.chip, styles.sourceChip]} textStyle={styles.sourceChipText}>Inventario</Chip>
+                    ) : (
+                      <Chip mode="outlined" style={[styles.chip, styles.cimaChip]} textStyle={styles.cimaChipText}>CIMA</Chip>
                     )}
                   </View>
                 </Card.Content>
@@ -185,6 +209,10 @@ const styles = StyleSheet.create({
   prescChip: { borderColor: BrandColors.danger },
   addedChip: { borderColor: BrandColors.success },
   addedChipText: { color: BrandColors.success, fontSize: 11 },
+  sourceChip: { borderColor: BrandColors.primary },
+  sourceChipText: { color: BrandColors.primary, fontSize: 11 },
+  cimaChip: { borderColor: '#999' },
+  cimaChipText: { color: '#999', fontSize: 11 },
   card: { marginBottom: 12 },
   name: { fontSize: 16 },
   row: { flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' },
