@@ -1,14 +1,13 @@
 import { View, FlatList, StyleSheet, Modal, Alert, Platform, ScrollView, Pressable } from 'react-native';
-import { Card, Title, Paragraph, Button, TextInput, Chip, IconButton } from 'react-native-paper';
+import { Card, Title, Paragraph, Button, TextInput, Chip, IconButton, Portal, Snackbar } from 'react-native-paper';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
 import RNDateTimePicker from '@react-native-community/datetimepicker';
 import { apiFetch } from '@/api/client';
 import type { InventoryItem, Lot } from '@/api/types';
 import { ErrorView } from '@/components/ErrorView';
 import { useToast } from '@/hooks/use-toast';
-import { ToastSnackbar } from '@/components/ToastSnackbar';
 import { BrandColors } from '@/constants/theme';
 
 export default function InventoryScreen() {
@@ -102,6 +101,11 @@ export default function InventoryScreen() {
     return { text: `Caduca ${formatted}` };
   };
 
+  const sortedInventory = useMemo(() => {
+    if (!inventory) return [];
+    return [...inventory].sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }, [inventory]);
+
   if (isError && !inventory) {
     return <ErrorView message="No se pudo cargar el inventario" onRetry={() => refetch()} />;
   }
@@ -109,7 +113,7 @@ export default function InventoryScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={inventory}
+        data={sortedInventory}
         keyExtractor={(item) => item.id}
         refreshing={isLoading}
         onRefresh={() => refetch()}
@@ -142,6 +146,9 @@ export default function InventoryScreen() {
                         ]}>
                           {expiry.text}
                         </Paragraph>
+                      )}
+                      {!expiry && (
+                        <Paragraph style={styles.lotExpiry}>Sin fecha de caducidad</Paragraph>
                       )}
                     </View>
                     <IconButton
@@ -194,6 +201,7 @@ export default function InventoryScreen() {
                     onChangeText={setDailyDose}
                     mode="outlined"
                     keyboardType="numeric"
+                    placeholder="Ej: 2 (comprimidos al día)"
                     style={styles.input}
                   />
                   <View style={styles.dateRow}>
@@ -212,17 +220,25 @@ export default function InventoryScreen() {
                     )}
                   </View>
                   {showDatePicker && (
-                    <RNDateTimePicker
-                      value={expiryDate ?? new Date()}
-                      mode="date"
-                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                      minimumDate={new Date()}
-                      onChange={(_, date) => {
-                        if (Platform.OS === 'android') setShowDatePicker(false);
-                        if (date) setExpiryDate(date);
-                        else if (Platform.OS === 'ios') setShowDatePicker(false);
-                      }}
-                    />
+                    <View>
+                      <RNDateTimePicker
+                        value={expiryDate ?? new Date()}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        minimumDate={new Date()}
+                        onChange={(_, date) => {
+                          if (Platform.OS === 'android') {
+                            setShowDatePicker(false);
+                          }
+                          if (date) setExpiryDate(date);
+                        }}
+                      />
+                      {Platform.OS === 'ios' && (
+                        <View style={styles.datePickerActions}>
+                          <Button onPress={() => setShowDatePicker(false)}>Hecho</Button>
+                        </View>
+                      )}
+                    </View>
                   )}
                 </Card.Content>
                 <Card.Actions>
@@ -243,7 +259,20 @@ export default function InventoryScreen() {
         </Pressable>
       </Modal>
 
-      <ToastSnackbar toast={toast} onDismiss={hide} />
+      <Portal>
+        <Snackbar
+          visible={toast !== null}
+          onDismiss={hide}
+          duration={3000}
+          style={{
+            backgroundColor: toast?.type === 'error' ? BrandColors.danger
+              : toast?.type === 'info' ? '#333333'
+              : BrandColors.primary,
+          }}
+        >
+          {toast?.message ?? ''}
+        </Snackbar>
+      </Portal>
     </View>
   );
 }
@@ -268,4 +297,5 @@ const styles = StyleSheet.create({
   dateRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 8 },
   dateLabel: { flex: 1, fontSize: 14 },
   dateButton: { flex: 1 },
+  datePickerActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
 });
