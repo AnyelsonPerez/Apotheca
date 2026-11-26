@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
 import { Card, Title, Paragraph, Button, Chip, Searchbar } from 'react-native-paper';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
 import { apiFetch } from '@/api/client';
-import type { CimaSearchResult, Medication, InventoryItem } from '@/api/types';
+import type { CimaSearchResult, Medication, CimaSearchResponse } from '@/api/types';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useToast } from '@/hooks/use-toast';
 import { ToastSnackbar } from '@/components/ToastSnackbar';
@@ -14,24 +15,23 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [searchType, setSearchType] = useState<'name' | 'active'>('name');
   const debouncedQuery = useDebounce(query, 400);
+  const isTyping = query !== debouncedQuery;
   const qc = useQueryClient();
   const { toast, show, hide } = useToast();
 
-  const { data: inventory } = useQuery({
-    queryKey: ['inventory'],
-    queryFn: () => apiFetch<InventoryItem[]>('/inventory'),
-  });
-
-  const inventoryNregistros = new Set(inventory?.map((m) => m.national_code) ?? []);
-
-  const { data, isFetching, isError, refetch } = useQuery({
+  const { data: searchResponse, isFetching, isError, refetch } = useQuery({
     queryKey: ['cima', searchType, debouncedQuery],
     queryFn: () => {
       const param = searchType === 'name' ? `nombre=${encodeURIComponent(debouncedQuery)}` : `pactivos=${encodeURIComponent(debouncedQuery)}`;
-      return apiFetch<CimaSearchResult[]>(`/cima/search?${param}`);
+      return apiFetch<CimaSearchResponse>(`/cima/search?${param}`);
     },
     enabled: debouncedQuery.length >= 2,
   });
+
+  const results: CimaSearchResult[] = [
+    ...(searchResponse?.inventory ?? []),
+    ...(searchResponse?.cima ?? []),
+  ];
 
   const addMutation = useMutation({
     mutationFn: (nregistro: string) =>
@@ -39,14 +39,17 @@ export default function SearchScreen() {
         method: 'POST',
         body: JSON.stringify({ nregistro }),
       }),
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       qc.invalidateQueries({ queryKey: ['inventory'] });
+      qc.invalidateQueries({ queryKey: ['cima'] });
       show('Medicamento añadido al inventario');
     },
-    onError: (err) => show(String(err.message), 'error'),
+    onError: async (err) => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      show(String(err.message), 'error');
+    },
   });
-
-  const results = data ?? [];
 
   return (
     <View style={styles.container}>
@@ -55,6 +58,7 @@ export default function SearchScreen() {
         value={query}
         onChangeText={setQuery}
         style={styles.search}
+        loading={isTyping || isFetching}
       />
       <View style={styles.chips}>
         <Chip
@@ -74,11 +78,11 @@ export default function SearchScreen() {
       ) : (
         <FlatList
           data={results}
-          keyExtractor={(item) => item.nregistro}
+          keyExtractor={(item, i) => `${item.nregistro}-${i}`}
           refreshing={isFetching}
-          onRefresh={() => {}}
+          onRefresh={() => refetch()}
           renderItem={({ item }) => {
-            const alreadyAdded = inventoryNregistros.has(item.nregistro);
+            const alreadyAdded = item.in_inventory === true;
             return (
               <Card style={styles.card}>
                 <Card.Content>
@@ -109,7 +113,7 @@ export default function SearchScreen() {
             );
           }}
           ListEmptyComponent={
-            debouncedQuery.length >= 2 && !isFetching ? (
+            debouncedQuery.length >= 2 && !isFetching && !isTyping ? (
               <Paragraph style={styles.empty}>Sin resultados para &ldquo;{debouncedQuery}&rdquo;</Paragraph>
             ) : undefined
           }
