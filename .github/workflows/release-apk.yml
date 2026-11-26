@@ -62,16 +62,12 @@ jobs:
           # Increase JVM heap to avoid GC thrashing during New Arch C++ compilation
           sed -i 's/^org.gradle.jvmargs=.*/org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g/' "$PROPS"
 
-          # Enable Gradle build cache + configuration cache
+          # Enable Gradle build cache (configuration-cache is NOT compatible
+          # with React Native's build.gradle which calls node during config phase)
           if grep -q "^org.gradle.caching=" "$PROPS"; then
             sed -i 's/^org.gradle.caching=.*/org.gradle.caching=true/' "$PROPS"
           else
             echo "org.gradle.caching=true" >> "$PROPS"
-          fi
-          if grep -q "^org.gradle.configuration-cache=" "$PROPS"; then
-            sed -i 's/^org.gradle.configuration-cache=.*/org.gradle.configuration-cache=true/' "$PROPS"
-          else
-            echo "org.gradle.configuration-cache=true" >> "$PROPS"
           fi
 
           echo "=== Final gradle.properties ==="
