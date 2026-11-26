@@ -1,6 +1,7 @@
 """Unit tests for the CIMA client with HTTP mocked via respx — no real network calls."""
 import respx
-from httpx import Response
+import pytest
+from httpx import Response, HTTPStatusError
 
 from apotheca_api.cima import CIMA_BASE_URL, CimaClient
 
@@ -58,16 +59,13 @@ class TestCimaClientGetMedication:
         assert data["nombre"] == "Ibuprofeno Test 400mg"
 
     @respx.mock
-    async def test_get_medication_404_returns_error(self):
+    async def test_get_medication_404_raises_http_status_error(self):
         respx.get(f"{CIMA_BASE_URL}/medicamento").mock(
             return_value=Response(404, json={"error": "Not found"})
         )
         client = CimaClient()
-        try:
+        with pytest.raises(HTTPStatusError):
             await client.get_medication("nonexistent")
-            assert False, "Should have raised"
-        except Exception:
-            pass
 
     @respx.mock
     async def test_get_medication_empty_body_returns_no_data(self):
@@ -84,11 +82,8 @@ class TestCimaClientErrorHandling:
     async def test_network_error_raises_exception(self):
         respx.get(f"{CIMA_BASE_URL}/medicamentos").mock(side_effect=ConnectionError("DNS failed"))
         client = CimaClient()
-        try:
+        with pytest.raises(Exception):
             await client.search_by_name("test")
-            assert False, "Should have raised"
-        except Exception:
-            pass
 
     @respx.mock
     async def test_500_raises_http_status_error(self):
@@ -96,8 +91,5 @@ class TestCimaClientErrorHandling:
             return_value=Response(500, text="Internal Server Error")
         )
         client = CimaClient()
-        try:
+        with pytest.raises(HTTPStatusError):
             await client.search_by_name("test")
-            assert False, "Should have raised"
-        except Exception:
-            pass

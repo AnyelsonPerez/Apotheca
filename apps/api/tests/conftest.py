@@ -1,5 +1,6 @@
 """Test fixtures: in-memory SQLite, TestClient, CIMA mock — zero disk artifacts."""
 from collections.abc import Generator
+from contextlib import asynccontextmanager
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,8 +11,13 @@ from sqlalchemy.pool import StaticPool
 from apotheca_api.app import app
 from apotheca_api.database import Base, get_db
 from apotheca_api.models import Settings, User
-from apotheca_api.security import create_access_token, hash_password
 from apotheca_api.seed import DEFAULT_SETTINGS, seed_settings
+from apotheca_api.security import create_access_token, hash_password
+
+
+@asynccontextmanager
+async def _noop_lifespan(app):
+    yield
 
 
 @pytest.fixture
@@ -47,6 +53,7 @@ def client(db_session) -> Generator[TestClient, None, None]:
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    app.router.lifespan_context = _noop_lifespan
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
@@ -72,6 +79,7 @@ def seeded_client(db_session) -> Generator[TestClient, None, None]:
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    app.router.lifespan_context = _noop_lifespan
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

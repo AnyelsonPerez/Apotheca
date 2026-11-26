@@ -69,6 +69,7 @@ class TestExpiryAlerts:
         assert body["expiry"][0]["medication_name"] == "Test Medication"
         assert body["expiry"][0]["alert_type"] == "expiry"
         assert body["expiry"][0]["days_until_expiry"] <= 10
+        assert body["expiry"][0]["days_until_expiry"] >= 9
 
     def test_no_expiry_alert_when_far_future(self, seeded_client, auth_headers, db_session):
         user_id = _get_user_id(db_session)
