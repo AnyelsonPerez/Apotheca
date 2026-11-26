@@ -17,11 +17,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'docker compose -f ../infrastructure/docker/docker-compose.yml -f ../infrastructure/docker/docker-compose.test.yml up --build -d',
-    url: 'http://localhost:49200',
-    timeout: 120_000,
-    reuseExistingServer: false,
-    cwd: __dirname,
-  },
+  // In CI, the Docker stack is managed by the workflow.
+  // Locally, run `docker compose up` before `pnpm test:e2e`.
+  webServer: process.env.CI
+    ? undefined
+    : {
+        command: 'docker compose -f ../infrastructure/docker/docker-compose.yml -f ../infrastructure/docker/docker-compose.test.yml up --build -d',
+        url: 'http://localhost:49200',
+        timeout: 120_000,
+        reuseExistingServer: true,
+        cwd: __dirname,
+      },
 })

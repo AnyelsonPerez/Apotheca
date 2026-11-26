@@ -28,10 +28,13 @@ jobs:
         run: uv python install
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --extra dev
+
+      - name: Run tests
+        run: uv run pytest --tb=short -v
 
       - name: Run type checks
-        run: uv run pyright || true
+        run: uv run pyright
 
   web:
     name: Web (React)
@@ -50,6 +53,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm --filter @apotheca/web test
 
       - name: Build
         run: pnpm --filter @apotheca/web build
@@ -72,5 +78,74 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Run tests
+        run: pnpm --filter @apotheca/mobile test
+
       - name: Type check
-        run: pnpm --filter @apotheca/mobile exec tsc --noEmit || true
+        run: pnpm --filter @apotheca/mobile exec tsc --noEmit
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: [api, web]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Set up Python for seed script
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Install httpx for seed script
+        run: pip install httpx
+
+      - name: Start Docker stack
+        working-directory: infrastructure/docker
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.test.yml \
+            up --build -d
+
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/api/health | grep -q '"ok"'; then
+              echo "API is healthy"
+              exit 0
+            fi
+            echo "Waiting for API... ($i/30)"
+            sleep 2
+          done
+          echo "API did not become healthy"
+          exit 1
+
+      - name: Run seed script
+        run: python e2e/fixtures/seed.py --base-url http://localhost:8000/api
+
+      - name: Run Playwright tests
+        run: pnpm test:e2e
+
+      - name: Tear down Docker stack
+        if: always()
+        working-directory: infrastructure/docker
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.test.yml \
+            down -v
