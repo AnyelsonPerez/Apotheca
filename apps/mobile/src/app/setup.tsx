@@ -12,6 +12,8 @@ export default function SetupScreen() {
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
 
+  const urlValid = /^https?:\/\/.+/i.test(url.trim());
+
   const handleSave = async () => {
     setError('');
     setChecking(true);
@@ -59,12 +61,17 @@ export default function SetupScreen() {
           mode="contained"
           onPress={handleSave}
           loading={checking}
-          disabled={!url.trim()}
+          disabled={!urlValid}
           style={styles.button}
           buttonColor={BrandColors.primary}
         >
           Conectar
         </Button>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {!error && !urlValid && url.length > 0 ? (
+          <Text style={styles.error}>La URL debe empezar por http:// o https://</Text>
+        ) : null}
 
         <Text style={styles.help}>
           Introduce la IP o dominio de tu servidor Apotheca.
