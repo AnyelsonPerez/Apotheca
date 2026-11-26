@@ -74,6 +74,10 @@ echo ""
 # -- Interactive prompts --
 read -rp "$(echo -e "${BL}Container ID [${DEFAULT_CT_ID}]: ${CL}")" CT_ID
 CT_ID="${CT_ID:-$DEFAULT_CT_ID}"
+# Validate container ID is numeric to prevent injection
+if [[ ! "$CT_ID" =~ ^[0-9]+$ ]]; then
+  msg_error "Invalid container ID '$CT_ID'. Must be a number."
+fi
 
 read -rp "$(echo -e "${BL}IP address (CIDR, e.g. 10.10.0.220/24) or DHCP: ${CL}")" CT_IP
 if [[ -z "$CT_IP" || "${CT_IP,,}" == "dhcp" ]]; then
@@ -174,9 +178,9 @@ msg_info "Downloading APK from GitHub Releases"
 pct exec "$CT_ID" -- bash -c 'mkdir -p /var/www/apotheca/downloads; curl -fsSL -o /var/www/apotheca/downloads/apotheca.apk https://github.com/AnyelsonPerez/Apotheca/releases/download/latest/apotheca.apk || echo "APK not available yet - build may still be running"'
 msg_ok "APK downloaded"
 
-# -- 9. Configure nginx (copy from repo, no heredoc needed) --
+# -- 9. Configure nginx (copy from repo, validate before restart) --
 msg_info "Configuring nginx"
-pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/nginx-apotheca.conf /etc/nginx/sites-available/apotheca && ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca && rm -f /etc/nginx/sites-enabled/default && systemctl restart nginx"
+pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/nginx-apotheca.conf /etc/nginx/sites-available/apotheca && ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca && rm -f /etc/nginx/sites-enabled/default && nginx -t && systemctl restart nginx" || msg_error "nginx config validation failed. Check: pct exec ${CT_ID} -- nginx -t"
 msg_ok "nginx configured"
 
 # -- 9b. Install update script --
@@ -209,8 +213,8 @@ fi
 echo ""
 echo -e "${GN}${APP} has been successfully installed!${CL}"
 echo ""
-echo -e "  ${BL}Web UI:${CL}    http://${CT_IP%%/*}"
-echo -e "  ${BL}API Docs:${CL}  http://${CT_IP%%/*}/api/docs"
+echo -e "  ${BL}Web UI:${CL}    http://${CT_IP%%/*}:49200"
+echo -e "  ${BL}API Docs:${CL}  http://${CT_IP%%/*}:49200/api/docs"
 echo ""
 echo -e "  ${BL}Container:${CL}  pct enter ${CT_ID}"
 echo -e "  ${BL}App dir:${CL}    ${INSTALL_DIR}"
@@ -221,4 +225,7 @@ echo -e "                  (or: bash ${INSTALL_DIR}/update.sh)"
 echo ""
 echo -e "${YW}Next: Open the Web UI and register your first user.${CL}"
 echo -e "${YW}Then visit /app to download the Android APK.${CL}"
+echo ""
+echo -e "${BL}HTTPS:${CL} Configure TLS at your reverse proxy (e.g. HAProxy)"
+echo -e "${BL}       ${CL} Point HAProxy backend to http://${CT_IP%%/*}:49200"
 echo ""

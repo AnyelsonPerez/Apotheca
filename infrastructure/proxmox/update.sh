@@ -34,7 +34,11 @@ self_repair() {
   cp "$INSTALL_DIR/infrastructure/proxmox/nginx-apotheca.conf" /etc/nginx/sites-available/apotheca
   ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca
   rm -f /etc/nginx/sites-enabled/default
-  nginx -t 2>/dev/null && systemctl reload nginx || systemctl restart nginx
+  if nginx -t 2>/dev/null; then
+    systemctl reload nginx || true
+  else
+    systemctl restart nginx || true
+  fi
   msg_ok "nginx config synced"
 
   # systemd service — always sync
