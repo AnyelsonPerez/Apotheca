@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from apotheca_api.config import settings
 from apotheca_api.database import get_db
-from apotheca_api.deps import generate_token_hash
+from apotheca_api.deps import generate_token_hash, get_current_user
 from apotheca_api.models import AuditLog, PasswordResetToken, User
 from apotheca_api.schemas import (
     LoginRequest,
@@ -87,6 +87,11 @@ def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)):
     access = create_access_token(user.id, extra={"email": user.email, "admin": user.is_admin})
     new_refresh = create_refresh_token(user.id)
     return TokenResponse(access_token=access, refresh_token=new_refresh)
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(user: User = Depends(get_current_user)):
+    return user
 
 
 @router.post("/password-reset", status_code=status.HTTP_202_ACCEPTED)
