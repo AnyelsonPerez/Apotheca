@@ -1,12 +1,13 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { PaperProvider, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
+import { PaperProvider, MD3DarkTheme, MD3LightTheme, ActivityIndicator } from 'react-native-paper';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, View, StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { hasServerUrl } from '@/api/client';
+import { BrandColors } from '@/constants/theme';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,7 +16,7 @@ const queryClient = new QueryClient({
 });
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isAuthLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const [serverConfigured, setServerConfigured] = useState<boolean | null>(null);
@@ -27,11 +28,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const inAuthGroup = segments[0] === 'login';
   const inSetup = segments[0] === 'setup';
 
-  useEffect(() => {
-    // Wait until we've checked server config
-    if (serverConfigured === null) return;
+  const isReady = serverConfigured !== null && !isAuthLoading;
 
-    // No server URL → setup screen
+  useEffect(() => {
+    if (!isReady) return;
+
     if (!serverConfigured && !inSetup) {
       router.replace('/setup');
       return;
@@ -42,10 +43,22 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     } else if (isAuthenticated && (inAuthGroup || inSetup)) {
       router.replace('/');
     }
-  }, [isAuthenticated, inAuthGroup, inSetup, serverConfigured, router]);
+  }, [isAuthenticated, isAuthLoading, inAuthGroup, inSetup, serverConfigured, isReady, router]);
+
+  if (!isReady) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={BrandColors.primary} />
+      </View>
+    );
+  }
 
   return <>{children}</>;
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+});
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
