@@ -42,8 +42,14 @@ export default function ScannerScreen() {
       if (String(err).includes('404')) {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
+    } finally {
+      setSearching(false);
     }
+  };
+
+  const cancelSearch = () => {
     setSearching(false);
+    reset();
   };
 
   const onCodeScanned = useCallback(async (codes: { value?: string }[]) => {
@@ -54,7 +60,12 @@ export default function ScannerScreen() {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const value = code.value;
         setScannedCode(value);
-        searchByBarcode(value);
+        // Brief delay so the user can see the scanned code before lookup
+        setTimeout(() => {
+          if (isScanningRef.current && scannedCode === value) {
+            searchByBarcode(value);
+          }
+        }, 300);
         break;
       }
     }
@@ -162,7 +173,7 @@ export default function ScannerScreen() {
             )}
           </Card.Content>
           <Card.Actions>
-            <Button onPress={reset}>Escanear otro</Button>
+            <Button onPress={() => searching ? cancelSearch() : reset()}>{searching ? 'Cancelar' : 'Escanear otro'}</Button>
             {searchResult && (
               <Button
                 mode="contained"
