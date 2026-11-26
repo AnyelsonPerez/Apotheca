@@ -181,6 +181,11 @@ msg_info "Cloning Apotheca"
 pct exec "$CT_ID" -- bash -c "rm -rf ${INSTALL_DIR}; git clone -q ${REPO} ${INSTALL_DIR}"
 msg_ok "Repository cloned"
 
+# -- 6b. Install update script early so it survives any later failure --
+msg_info "Installing update script"
+pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/update.sh ${INSTALL_DIR}/update.sh && chmod +x ${INSTALL_DIR}/update.sh && ln -sf ${INSTALL_DIR}/update.sh /usr/local/bin/apotheca-update && ln -sf ${INSTALL_DIR}/update.sh /usr/local/bin/update"
+msg_ok "Update script installed (run: update or apotheca-update)"
+
 # -- 7. Setup API (uv installs Python 3.12 automatically) --
 msg_info "Setting up API (uv will install Python 3.12)"
 pct exec "$CT_ID" -- bash -c 'export PATH="/root/.local/bin:$PATH"; cd '"${INSTALL_DIR}"'/apps/api; mkdir -p '"${DATA_DIR}"'; uv sync --no-dev; uv run alembic upgrade head' || msg_error "API setup failed. Check the output above."
@@ -200,11 +205,6 @@ msg_ok "APK downloaded"
 msg_info "Configuring nginx"
 pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/nginx-apotheca.conf /etc/nginx/sites-available/apotheca && ln -sf /etc/nginx/sites-available/apotheca /etc/nginx/sites-enabled/apotheca && rm -f /etc/nginx/sites-enabled/default && nginx -t 2>&1 && systemctl restart nginx" || msg_error "nginx config validation failed. Check: pct exec ${CT_ID} -- nginx -t"
 msg_ok "nginx configured (listening on port 49200)"
-
-# -- 9b. Install update script --
-msg_info "Installing update script"
-pct exec "$CT_ID" -- bash -c "cp ${INSTALL_DIR}/infrastructure/proxmox/update.sh ${INSTALL_DIR}/update.sh && chmod +x ${INSTALL_DIR}/update.sh && ln -sf ${INSTALL_DIR}/update.sh /usr/local/bin/apotheca-update && ln -sf ${INSTALL_DIR}/update.sh /usr/local/bin/update"
-msg_ok "Update script installed (run: update or apotheca-update)"
 
 # -- 10. Create systemd service (copy from repo, verify it started) --
 msg_info "Creating systemd service"
