@@ -28,6 +28,7 @@ msg_ok()   { echo -e " ${GN}[OK]${CL}   ${1}"; }
 msg_error(){ echo -e " ${RD}[ERROR]${CL} ${1}"; exit 1; }
 
 # -- Ensure this script is callable as 'apotheca-update' / 'update' --
+chmod +x "$INSTALL_DIR/infrastructure/proxmox/update.sh" 2>/dev/null || true
 if [ "$(command -v apotheca-update 2>/dev/null)" != "$INSTALL_DIR/update.sh" ]; then
   ln -sf "$INSTALL_DIR/update.sh" /usr/local/bin/apotheca-update 2>/dev/null || true
   ln -sf "$INSTALL_DIR/update.sh" /usr/local/bin/update 2>/dev/null || true
