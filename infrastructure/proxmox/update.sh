@@ -91,7 +91,7 @@ msg_ok "Dependencies synced"
 
 # -- 3. Run database migrations --
 msg_info "Running database migrations"
-uv run alembic upgrade head || true
+uv run alembic upgrade head
 msg_ok "Migrations complete"
 
 # -- 4. Rebuild web frontend --

@@ -165,7 +165,7 @@ msg_ok "Repository cloned"
 
 # -- 7. Setup API (uv installs Python 3.12 automatically) --
 msg_info "Setting up API (uv will install Python 3.12)"
-pct exec "$CT_ID" -- bash -c 'export PATH="/root/.local/bin:$PATH"; cd '"${INSTALL_DIR}"'/apps/api; mkdir -p '"${DATA_DIR}"'; uv sync --no-dev; uv run alembic upgrade head || true'
+pct exec "$CT_ID" -- bash -c 'export PATH="/root/.local/bin:$PATH"; cd '"${INSTALL_DIR}"'/apps/api; mkdir -p '"${DATA_DIR}"'; uv sync --no-dev; uv run alembic upgrade head'
 msg_ok "API ready"
 
 # -- 8. Build web frontend --
