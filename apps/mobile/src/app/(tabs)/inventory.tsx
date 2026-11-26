@@ -1,15 +1,19 @@
-import { View, FlatList, StyleSheet, Modal, Alert, Platform } from 'react-native';
+import { View, FlatList, StyleSheet, Modal, Alert, Platform, ScrollView, Pressable } from 'react-native';
 import { Card, Title, Paragraph, Button, TextInput, Chip, IconButton } from 'react-native-paper';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import RNDateTimePicker from '@react-native-community/datetimepicker';
 import { apiFetch } from '@/api/client';
 import type { InventoryItem, Lot } from '@/api/types';
 import { ErrorView } from '@/components/ErrorView';
+import { useToast } from '@/hooks/use-toast';
+import { ToastSnackbar } from '@/components/ToastSnackbar';
 import { BrandColors } from '@/constants/theme';
 
 export default function InventoryScreen() {
   const qc = useQueryClient();
+  const { toast, show, hide } = useToast();
   const { data: inventory, isLoading, isError, refetch } = useQuery({
     queryKey: ['inventory'],
     queryFn: () => apiFetch<InventoryItem[]>('/inventory'),
@@ -26,6 +30,7 @@ export default function InventoryScreen() {
     setQuantity('');
     setDailyDose('');
     setExpiryDate(null);
+    setShowDatePicker(false);
   };
 
   const createLot = useMutation({
@@ -39,20 +44,32 @@ export default function InventoryScreen() {
           expiry_date: expiryDate ? expiryDate.toISOString() : null,
         }),
       }),
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       qc.invalidateQueries({ queryKey: ['inventory'] });
+      show('Lote añadido correctamente');
       resetModal();
+    },
+    onError: async (err) => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      show(String(err.message), 'error');
     },
   });
 
   const deleteMed = useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/inventory/medications/${id}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['inventory'] }),
+    onSuccess: async () => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+    },
   });
 
   const deleteLot = useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/inventory/lots/${id}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['inventory'] }),
+    onSuccess: async () => {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      qc.invalidateQueries({ queryKey: ['inventory'] });
+    },
   });
 
   const confirmDeleteMed = (id: string, name: string) => {
@@ -95,9 +112,9 @@ export default function InventoryScreen() {
         data={inventory}
         keyExtractor={(item) => item.id}
         refreshing={isLoading}
-        onRefresh={() => {}}
+        onRefresh={() => refetch()}
         ListEmptyComponent={<Paragraph style={styles.empty}>Sin medicamentos. Usa Buscar o Escanear para añadir.</Paragraph>}
-        renderItem={({ item, index: medIndex }) => (
+        renderItem={({ item }) => (
           <Card style={styles.card}>
             <Card.Content>
               <View style={styles.cardHeader}>
@@ -156,71 +173,77 @@ export default function InventoryScreen() {
       />
 
       <Modal visible={!!modalMed} animationType="slide" transparent onRequestClose={resetModal}>
-        <View style={styles.modalOverlay}>
-          <Card style={styles.modalCard}>
-            <Card.Content>
-              <Title>Añadir lote</Title>
-              <Paragraph numberOfLines={2} style={styles.modalMedName}>{modalMed?.name}</Paragraph>
-              <TextInput
-                label="Cantidad"
-                value={quantity}
-                onChangeText={setQuantity}
-                mode="outlined"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-              <TextInput
-                label="Dosis diaria (opcional)"
-                value={dailyDose}
-                onChangeText={setDailyDose}
-                mode="outlined"
-                keyboardType="numeric"
-                style={styles.input}
-              />
-              <View style={styles.dateRow}>
-                <Paragraph style={styles.dateLabel}>Fecha de caducidad:</Paragraph>
-                <Button
-                  mode="outlined"
-                  onPress={() => setShowDatePicker(true)}
-                  style={styles.dateButton}
-                >
-                  {expiryDate
-                    ? expiryDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
-                    : 'Seleccionar'}
-                </Button>
-                {expiryDate && (
-                  <IconButton icon="close" size={18} onPress={() => setExpiryDate(null)} />
-                )}
-              </View>
-              {showDatePicker && (
-                <RNDateTimePicker
-                  value={expiryDate ?? new Date()}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                  minimumDate={new Date()}
-                  onChange={(_, date) => {
-                    if (Platform.OS === 'android') setShowDatePicker(false);
-                    if (date) setExpiryDate(date);
-                    else if (Platform.OS === 'ios') setShowDatePicker(false);
-                  }}
-                />
-              )}
-            </Card.Content>
-            <Card.Actions>
-              <Button onPress={resetModal}>Cancelar</Button>
-              <Button
-                mode="contained"
-                buttonColor={BrandColors.primary}
-                loading={createLot.isPending}
-                disabled={!quantity.trim()}
-                onPress={() => createLot.mutate()}
-              >
-                Guardar
-              </Button>
-            </Card.Actions>
-          </Card>
-        </View>
+        <Pressable style={styles.modalOverlay} onPress={resetModal}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <ScrollView contentContainerStyle={styles.modalScroll}>
+              <Card>
+                <Card.Content>
+                  <Title>Añadir lote</Title>
+                  <Paragraph numberOfLines={2} style={styles.modalMedName}>{modalMed?.name}</Paragraph>
+                  <TextInput
+                    label="Cantidad"
+                    value={quantity}
+                    onChangeText={setQuantity}
+                    mode="outlined"
+                    keyboardType="numeric"
+                    style={styles.input}
+                  />
+                  <TextInput
+                    label="Dosis diaria (opcional)"
+                    value={dailyDose}
+                    onChangeText={setDailyDose}
+                    mode="outlined"
+                    keyboardType="numeric"
+                    style={styles.input}
+                  />
+                  <View style={styles.dateRow}>
+                    <Paragraph style={styles.dateLabel}>Caducidad:</Paragraph>
+                    <Button
+                      mode="outlined"
+                      onPress={() => setShowDatePicker(true)}
+                      style={styles.dateButton}
+                    >
+                      {expiryDate
+                        ? expiryDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : 'Seleccionar'}
+                    </Button>
+                    {expiryDate && (
+                      <IconButton icon="close" size={18} onPress={() => setExpiryDate(null)} />
+                    )}
+                  </View>
+                  {showDatePicker && (
+                    <RNDateTimePicker
+                      value={expiryDate ?? new Date()}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      minimumDate={new Date()}
+                      onChange={(_, date) => {
+                        if (Platform.OS === 'android') setShowDatePicker(false);
+                        if (date) setExpiryDate(date);
+                        else if (Platform.OS === 'ios') setShowDatePicker(false);
+                      }}
+                    />
+                  )}
+                </Card.Content>
+                <Card.Actions>
+                  <Button onPress={resetModal}>Cancelar</Button>
+                  <Button
+                    mode="contained"
+                    buttonColor={BrandColors.primary}
+                    loading={createLot.isPending}
+                    disabled={!quantity.trim()}
+                    onPress={() => createLot.mutate()}
+                  >
+                    Guardar
+                  </Button>
+                </Card.Actions>
+              </Card>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
       </Modal>
+
+      <ToastSnackbar toast={toast} onDismiss={hide} />
     </View>
   );
 }
@@ -238,7 +261,8 @@ const styles = StyleSheet.create({
   lotExpiryWarning: { color: BrandColors.warning, opacity: 1 },
   empty: { textAlign: 'center', marginTop: 24, opacity: 0.5 },
   modalOverlay: { flex: 1, justifyContent: 'center', padding: 16, backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalCard: { padding: 8 },
+  modalCard: { maxHeight: '80%' },
+  modalScroll: { paddingBottom: 16 },
   modalMedName: { marginBottom: 12, opacity: 0.6 },
   input: { marginBottom: 8 },
   dateRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 8 },
