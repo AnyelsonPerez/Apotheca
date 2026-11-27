@@ -3,7 +3,7 @@ import { Badge, Button, Card, Group, Loader, Modal, NumberInput, Stack, Text, Te
 import { DateInput } from '@mantine/dates'
 import { IconSearch, IconPlus, IconCheck, IconBarcode } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
-import { useAddMedication, useCimaDetail, useCimaSearch, useCimaBarcode, useCreateLot } from '../api/hooks'
+import { useAddMedication, useCimaDetail, useCimaSearch, useCimaBarcodeLookup, useCreateLot } from '../api/hooks'
 import { BarcodeScannerModal } from '../components/BarcodeScannerModal'
 import type { CimaSearchResult } from '../api/types'
 
@@ -20,8 +20,7 @@ export function SearchPage() {
 
   // Barcode scanner state
   const [scannerOpen, setScannerOpen] = useState(false)
-  const [scannedCn, setScannedCn] = useState<string | null>(null)
-  const { data: barcodeResult, isError: barcodeError, error: barcodeErrMsg } = useCimaBarcode(scannedCn)
+  const barcodeLookup = useCimaBarcodeLookup()
 
   // Lot modal state — the medication is only saved when the user hits "Guardar"
   const [lotModal, setLotModal] = useState<{ med: CimaSearchResult } | null>(null)
@@ -42,32 +41,34 @@ export function SearchPage() {
     }
   }, [cimaDetail, lotModal])
 
-  // Handle barcode scan result
-  useEffect(() => {
-    if (!scannedCn) return
-    if (barcodeResult) {
-      // Found medication via barcode — open the lot modal directly
+  // Handle barcode scan result — a one-shot mutation per scan keeps the
+  // scanner in control of its own feedback state (mobile parity). Returns
+  // false on failure so the scanner restarts its camera instead of dying.
+  const handleScan = async (barcode: string): Promise<boolean> => {
+    try {
+      const result = await barcodeLookup.mutateAsync(barcode)
+      setLotForm({ quantity: 0, daily_dose: '', expiry_date: null })
       setLotModal({
         med: {
-          nregistro: barcodeResult.nregistro,
-          nombre: barcodeResult.nombre,
-          pactivos: barcodeResult.pactivos,
-          labtitular: barcodeResult.labtitular,
-          dosis: barcodeResult.dosis,
-          cpresc: barcodeResult.cpresc,
+          nregistro: result.nregistro,
+          nombre: result.nombre,
+          pactivos: result.pactivos,
+          labtitular: result.labtitular,
+          dosis: result.dosis,
+          cpresc: result.cpresc,
         },
       })
-      setLotForm({ quantity: 0, daily_dose: '', expiry_date: null })
-      setScannedCn(null)
       setScannerOpen(false)
-    } else if (barcodeError) {
+      return true
+    } catch (err) {
+      const message = err instanceof Error && err.message ? err.message : 'CN no encontrado'
       notifications.show({
-        message: `No se encontró el medicamento en CIMA: ${barcodeErrMsg instanceof Error ? barcodeErrMsg.message : 'CN no encontrado'}`,
+        message: `No se encontró el medicamento en CIMA: ${message}`,
         color: 'red',
       })
-      setScannedCn(null)
+      return false
     }
-  }, [scannedCn, barcodeResult, barcodeError, barcodeErrMsg])
+  }
 
   const handleAdd = (r: CimaSearchResult) => {
     setLotForm({ quantity: 0, daily_dose: '', expiry_date: null })
@@ -159,7 +160,7 @@ export function SearchPage() {
       <BarcodeScannerModal
         opened={scannerOpen}
         onClose={() => setScannerOpen(false)}
-        onScan={(code) => setScannedCn(code)}
+        onScan={handleScan}
       />
       <Stack gap="xs">
         {isFetching && <Text c="dimmed">Buscando…</Text>}
