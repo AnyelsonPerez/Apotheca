@@ -105,8 +105,6 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
   // Per-invocation race token: only the latest camera start may attach.
   const runIdRef = useRef(0)
   const acceptTimerRef = useRef<number | null>(null)
-  // Set when a lookup fails: the camera effect restarts the stream.
-  const pendingRestartRef = useRef(false)
 
   const [phase, setPhase] = useState<ScannerPhase>('starting')
   const [errorMsg, setErrorMsg] = useState('')
@@ -151,7 +149,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
 
   /** Accept a successfully decoded barcode exactly once per scan session.
    * The camera is only torn down if the parent reports success; on failure
-   * the pendingRestart flag makes the camera effect restart the stream. */
+   * the scanRetryTick bump makes the camera effect restart the stream. */
   const acceptCode = useCallback(
     (code: string) => {
       if (scanningLockRef.current) return
@@ -173,9 +171,8 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
         if (ok) {
           stopEverything()
         } else {
-          // Lookup failed: tear down and flag a restart so scanning resumes.
+          // Lookup failed: tear down; the tick bump restarts the stream.
           stopEverything()
-          pendingRestartRef.current = true
           setScanRetryTick((t) => t + 1)
         }
       }, 350)
@@ -328,6 +325,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
   const startCamera = useCallback(async () => {
     stopEverything()
     cancelledRef.current = false
+    const runId = runIdRef.current
     setPhase('starting')
     setErrorMsg('')
     setScannedPreview(null)
@@ -356,6 +354,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
         })
       } catch (e) {
         // OverconstrainedError — retry with the bare minimum.
+        if (runId !== runIdRef.current) return
         if (e instanceof DOMException && e.name === 'OverconstrainedError') {
           await acquireCamera({ video: true, audio: false })
         } else {
@@ -363,7 +362,8 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
         }
       }
     } catch (e) {
-      if (cancelledRef.current) return
+      // A superseded run's failure must not clobber the newest run's state.
+      if (runId !== runIdRef.current) return
       const { message, phase: errPhase } = classifyCameraError(e)
       setErrorMsg(message)
       setPhase(errPhase)
@@ -377,7 +377,6 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
       stopEverything()
       return
     }
-    pendingRestartRef.current = false
     void startCamera()
     return stopEverything
   }, [opened, scanRetryTick, startCamera, stopEverything])
@@ -414,6 +413,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
     if (!next?.deviceId) return
     stopEverything()
     cancelledRef.current = false
+    const runId = runIdRef.current
     setTorchOn(false)
     setScannedPreview(null)
     scanningLockRef.current = false
@@ -424,7 +424,8 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
         audio: false,
       })
     } catch (e) {
-      if (cancelledRef.current) return
+      // A superseded flip's failure must not clobber the newest run's state.
+      if (runId !== runIdRef.current) return
       const { message, phase: errPhase } = classifyCameraError(e)
       setErrorMsg(message)
       setPhase(errPhase)
@@ -432,6 +433,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
   }
 
   const handleSubmitManual = async () => {
+    if (scanningLockRef.current) return
     const code = manualCode.trim()
     if (!code) return
     const digits = code.replace(/\D/g, '')
@@ -439,6 +441,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
       notifications.show({ message: 'El código debe tener al menos 6 dígitos', color: 'red' })
       return
     }
+    scanningLockRef.current = true
     let ok = false
     try {
       ok = await onScanRef.current(digits)
@@ -447,12 +450,12 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
     }
     if (ok) {
       stopEverything()
-    } else {
-      // Manual lookup failed: restart the camera for another try.
+    } else if (phase === 'scanning') {
+      // Manual lookup failed with a live camera: restart it for another try.
       stopEverything()
-      pendingRestartRef.current = true
       setScanRetryTick((t) => t + 1)
     }
+    scanningLockRef.current = false
   }
 
   const showVideo = phase === 'scanning'
