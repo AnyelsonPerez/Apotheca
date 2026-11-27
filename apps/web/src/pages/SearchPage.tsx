@@ -146,27 +146,23 @@ export function SearchPage() {
           onChange={(e) => setQuery(e.target.value)}
           style={{ flex: 1 }}
         />
-        {isMobile && (
-          <Tooltip label="Escanear código de barras">
-            <ActionIcon
-              variant="light"
-              color="teal"
-              size="lg"
-              onClick={() => setScannerOpen(true)}
-              aria-label="Escanear código de barras"
-            >
-              <IconBarcode size={20} />
-            </ActionIcon>
-          </Tooltip>
-        )}
+        <Tooltip label="Escanear código de barras">
+          <ActionIcon
+            variant="light"
+            color="teal"
+            size="lg"
+            onClick={() => setScannerOpen(true)}
+            aria-label="Escanear código de barras"
+          >
+            <IconBarcode size={20} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
-      {isMobile && (
-        <BarcodeScannerModal
-          opened={scannerOpen}
-          onClose={() => setScannerOpen(false)}
-          onScan={(code) => setScannedCn(code)}
-        />
-      )}
+      <BarcodeScannerModal
+        opened={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={(code) => setScannedCn(code)}
+      />
       <Stack gap="xs">
         {isFetching && <Text c="dimmed">Buscando…</Text>}
 
