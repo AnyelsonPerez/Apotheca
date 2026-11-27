@@ -38,10 +38,11 @@
         }
       ],
       [
-        "react-native-vision-camera",
+        "expo-camera",
         {
-          "cameraPermissionText": "Apotheca necesita acceso a la cámara para escanear códigos de barras de medicamentos.",
-          "enableCodeScanner": true
+          "cameraPermission": "Apotheca necesita acceso a la cámara para escanear códigos de barras de medicamentos.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
         }
       ],
       "@react-native-community/datetimepicker"

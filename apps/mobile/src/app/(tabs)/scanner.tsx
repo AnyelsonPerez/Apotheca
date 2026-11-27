@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, Linking, Alert } from 'react-native';
-import { Camera, useCameraDevice, useCameraPermission, useCodeScanner } from 'react-native-vision-camera';
+import { CameraView, BarcodeScanningResult, useCameraPermissions } from 'expo-camera';
 import { Card, Button, Title, Paragraph, ActivityIndicator, IconButton } from 'react-native-paper';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useFocusEffect, useIsFocused } from 'expo-router';
@@ -13,16 +13,14 @@ import { AddLotModal } from '@/components/AddLotModal';
 import { BrandColors } from '@/constants/theme';
 
 export default function ScannerScreen() {
-  const { hasPermission, requestPermission } = useCameraPermission();
+  const [permission, requestPermission] = useCameraPermissions();
   const router = useRouter();
   const isFocused = useIsFocused();
   const [scannedCode, setScannedCode] = useState<string | null>(null);
   const [searchResult, setSearchResult] = useState<CimaBarcodeResult | null>(null);
   const [searching, setSearching] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
-  const [permissionRequested, setPermissionRequested] = useState(false);
   const [pendingMed, setPendingMed] = useState<Medication | null>(null);
-  const device = useCameraDevice('back');
   const qc = useQueryClient();
   const isScanningRef = useRef(false);
   const { toast, show, hide } = useToast();
@@ -55,29 +53,18 @@ export default function ScannerScreen() {
     reset();
   };
 
-  const onCodeScanned = useCallback(async (codes: { value?: string }[]) => {
-    if (isScanningRef.current) return;
-    for (const code of codes) {
-      if (code.value) {
-        isScanningRef.current = true;
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        const value = code.value;
-        setScannedCode(value);
-        // Brief delay so the user can see the scanned code before lookup
-        setTimeout(() => {
-          if (isScanningRef.current) {
-            searchByBarcode(value);
-          }
-        }, 300);
-        break;
+  const onBarcodeScanned = useCallback(async ({ data }: BarcodeScanningResult) => {
+    if (isScanningRef.current || !data) return;
+    isScanningRef.current = true;
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setScannedCode(data);
+    // Brief delay so the user can see the scanned code before lookup
+    setTimeout(() => {
+      if (isScanningRef.current) {
+        searchByBarcode(data);
       }
-    }
+    }, 300);
   }, []);
-
-  const codeScanner = useCodeScanner({
-    codeTypes: ['ean-13', 'ean-8', 'qr', 'code-128', 'upc-e'],
-    onCodeScanned,
-  });
 
   const addMutation = useMutation({
     mutationFn: (nregistro: string) =>
@@ -103,9 +90,8 @@ export default function ScannerScreen() {
   };
 
   const handleRequestPermission = async () => {
-    setPermissionRequested(true);
-    const granted = await requestPermission();
-    if (!granted && permissionRequested) {
+    const result = await requestPermission();
+    if (!result.granted && !result.canAskAgain) {
       Alert.alert(
         'Permiso de cámara denegado',
         'Has denegado el permiso de cámara permanentemente. Habilítalo en los ajustes del sistema para usar el escáner.',
@@ -117,30 +103,27 @@ export default function ScannerScreen() {
     }
   };
 
-  if (!hasPermission) {
+  // Camera permissions are still loading.
+  if (!permission) {
+    return <View style={styles.center} />;
+  }
+
+  if (!permission.granted) {
     return (
       <View style={styles.center}>
         <Text style={styles.permissionText}>
-          {permissionRequested
-            ? 'Permiso de cámara denegado. Habilítalo en los ajustes del sistema.'
-            : 'Se necesita permiso de cámara'}
+          {permission.canAskAgain
+            ? 'Se necesita permiso de cámara'
+            : 'Permiso de cámara denegado. Habilítalo en los ajustes del sistema.'}
         </Text>
         <Button mode="contained" buttonColor={BrandColors.primary} onPress={handleRequestPermission}>
-          {permissionRequested ? 'Abrir ajustes' : 'Conceder permiso'}
+          {permission.canAskAgain ? 'Conceder permiso' : 'Abrir ajustes'}
         </Button>
-        {permissionRequested && (
+        {!permission.canAskAgain && (
           <Button mode="text" textColor={BrandColors.primary} onPress={() => Linking.openSettings()}>
             Ir a ajustes del sistema
           </Button>
         )}
-      </View>
-    );
-  }
-
-  if (!device) {
-    return (
-      <View style={styles.center}>
-        <Text>Cargando cámara…</Text>
       </View>
     );
   }
@@ -204,13 +187,21 @@ export default function ScannerScreen() {
 
   return (
     <View style={styles.cameraContainer}>
-      <Camera
-        device={device}
-        isActive={isFocused && !scannedCode && !pendingMed}
-        torch={torchOn ? 'on' : 'off'}
-        codeScanner={codeScanner}
-        style={StyleSheet.absoluteFill}
-      />
+      {/* Unmount the camera when the tab loses focus — only one preview
+          can be active at a time per Expo docs, and this also guarantees a
+          fresh camera session when returning to this screen. */}
+      {isFocused && (
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          enableTorch={torchOn}
+          onBarcodeScanned={onBarcodeScanned}
+          onMountError={({ message }) => show(message, 'error')}
+          barcodeScannerSettings={{
+            barcodeTypes: ['ean13', 'ean8', 'qr', 'code128', 'upc_e'],
+          }}
+        />
+      )}
       <View style={styles.overlay}>
         <View style={styles.scanFrame} />
         <Text style={styles.hint}>Escanea el código de barras del medicamento</Text>
