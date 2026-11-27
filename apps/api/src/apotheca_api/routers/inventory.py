@@ -118,6 +118,8 @@ def create_lot(
         quantity=payload.quantity,
         expiry_date=payload.expiry_date,
         daily_dose=payload.daily_dose,
+        treatment_days=payload.treatment_days,
+        dose_start_date=payload.dose_start_date,
         acquired_at=payload.acquired_at,
     )
     db.add(lot)
