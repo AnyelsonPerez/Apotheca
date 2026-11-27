@@ -14,7 +14,9 @@ import { BrowserMultiFormatReader, type IScannerControls } from '@zxing/browser'
 interface BarcodeScannerModalProps {
   opened: boolean
   onClose: () => void
-  onScan: (barcode: string) => void
+  /** Submit a scanned code. Resolve true on success (modal can close);
+   * resolve false or reject on failure (scanner will restart the camera). */
+  onScan: (barcode: string) => Promise<boolean>
 }
 
 type ScannerPhase =
@@ -98,7 +100,13 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
   const onScanRef = useRef(onScan)
   const scanningLockRef = useRef(false)
   const rafIdRef = useRef<number | null>(null)
+  const vfcIdRef = useRef<number | null>(null)
   const cancelledRef = useRef(false)
+  // Per-invocation race token: only the latest camera start may attach.
+  const runIdRef = useRef(0)
+  const acceptTimerRef = useRef<number | null>(null)
+  // Set when a lookup fails: the camera effect restarts the stream.
+  const pendingRestartRef = useRef(false)
 
   const [phase, setPhase] = useState<ScannerPhase>('starting')
   const [errorMsg, setErrorMsg] = useState('')
@@ -106,6 +114,8 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
   const [torchOn, setTorchOn] = useState(false)
   const [torchAvailable, setTorchAvailable] = useState(false)
   const [manualCode, setManualCode] = useState('')
+  // Bumped to re-run the camera effect after a failed lookup.
+  const [scanRetryTick, setScanRetryTick] = useState(0)
 
   const isMobile = useMediaQuery('(max-width: 620px)')
 
@@ -117,9 +127,20 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
   /** Stop every live resource the scanner owns. Synchronous by design. */
   const stopEverything = useCallback(() => {
     cancelledRef.current = true
+    // Invalidate every in-flight start and any pending accepted code.
+    runIdRef.current += 1
+    if (acceptTimerRef.current != null) {
+      clearTimeout(acceptTimerRef.current)
+      acceptTimerRef.current = null
+    }
     if (rafIdRef.current != null) {
       cancelAnimationFrame(rafIdRef.current)
       rafIdRef.current = null
+    }
+    if (vfcIdRef.current != null) {
+      const video = videoRef.current
+      video?.cancelVideoFrameCallback?.(vfcIdRef.current)
+      vfcIdRef.current = null
     }
     controlsRef.current?.stop()
     controlsRef.current = null
@@ -128,18 +149,34 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
     if (videoRef.current) videoRef.current.srcObject = null
   }, [])
 
-  /** Accept a successfully decoded barcode exactly once per scan session. */
+  /** Accept a successfully decoded barcode exactly once per scan session.
+   * The camera is only torn down if the parent reports success; on failure
+   * the pendingRestart flag makes the camera effect restart the stream. */
   const acceptCode = useCallback(
     (code: string) => {
       if (scanningLockRef.current) return
       scanningLockRef.current = true
+      const runId = runIdRef.current
       playBeep()
       vibrate(120)
       setScannedPreview(code)
-      window.setTimeout(() => {
-        if (!cancelledRef.current) {
+      acceptTimerRef.current = window.setTimeout(async () => {
+        acceptTimerRef.current = null
+        if (runId !== runIdRef.current) return
+        let ok = false
+        try {
+          ok = await onScanRef.current(code)
+        } catch {
+          ok = false
+        }
+        if (runId !== runIdRef.current) return
+        if (ok) {
           stopEverything()
-          onScanRef.current(code)
+        } else {
+          // Lookup failed: tear down and flag a restart so scanning resumes.
+          stopEverything()
+          pendingRestartRef.current = true
+          setScanRetryTick((t) => t + 1)
         }
       }, 350)
     },
@@ -152,9 +189,15 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
       video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }
     ).requestVideoFrameCallback
     if (typeof frameCb === 'function') {
-      frameCb.call(video, () => detect())
+      vfcIdRef.current = frameCb.call(video, () => {
+        vfcIdRef.current = null
+        detect()
+      })
     } else {
-      rafIdRef.current = requestAnimationFrame(() => detect())
+      rafIdRef.current = requestAnimationFrame(() => {
+        rafIdRef.current = null
+        detect()
+      })
     }
   }, [])
 
@@ -232,15 +275,17 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
     [detectWithNativeApi, startZxingFallback],
   )
 
-  /** Attach a stream to the video element and start decoding. */
+  /** Attach a stream to the video element and start decoding. Stops any
+   * previous stream first so overlapping starts can never orphan a track. */
   const attachStream = useCallback(
-    async (stream: MediaStream) => {
-      streamRef.current = stream
+    async (stream: MediaStream, runId: number) => {
       const video = videoRef.current
       if (!video) {
         stream.getTracks().forEach((t) => t.stop())
         return
       }
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+      streamRef.current = stream
       video.srcObject = stream
       video.muted = true
       try {
@@ -253,7 +298,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
           /* keep the stream; decoding still works on queued frames */
         }
       }
-      if (cancelledRef.current) return
+      if (runId !== runIdRef.current) return
 
       const track = stream.getVideoTracks()[0]
       const caps = track?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined
@@ -262,6 +307,21 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
       startDecoding(video)
     },
     [startDecoding],
+  )
+
+  /** Acquire a fresh camera run. The runId token makes overlapping calls
+   * safe: only the latest invocation is allowed to attach its stream. */
+  const acquireCamera = useCallback(
+    async (constraints: MediaStreamConstraints) => {
+      const runId = runIdRef.current
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      if (runId !== runIdRef.current) {
+        stream.getTracks().forEach((t) => t.stop())
+        return null
+      }
+      await attachStream(stream, runId)
+    },
+    [attachStream],
   )
 
   /** Start the camera stream with the environment camera preferred. */
@@ -285,9 +345,8 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
     }
 
     try {
-      let stream: MediaStream
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
+        await acquireCamera({
           video: {
             facingMode: { ideal: 'environment' },
             width: { ideal: 1280 },
@@ -296,35 +355,32 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
           audio: false,
         })
       } catch (e) {
-        // OverconstrainedError / NotFoundError — retry with the bare minimum.
+        // OverconstrainedError — retry with the bare minimum.
         if (e instanceof DOMException && e.name === 'OverconstrainedError') {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+          await acquireCamera({ video: true, audio: false })
         } else {
           throw e
         }
       }
-      if (cancelledRef.current) {
-        stream.getTracks().forEach((t) => t.stop())
-        return
-      }
-      await attachStream(stream)
     } catch (e) {
       if (cancelledRef.current) return
       const { message, phase: errPhase } = classifyCameraError(e)
       setErrorMsg(message)
       setPhase(errPhase)
     }
-  }, [attachStream, stopEverything])
+  }, [acquireCamera, stopEverything])
 
-  // Camera lifecycle: tied strictly to `opened` — callbacks live in refs.
+  // Camera lifecycle: tied to `opened` plus the retry tick — a failed
+  // lookup bumps the tick to restart the stream in place.
   useEffect(() => {
     if (!opened) {
       stopEverything()
       return
     }
+    pendingRestartRef.current = false
     void startCamera()
     return stopEverything
-  }, [opened, startCamera, stopEverything])
+  }, [opened, scanRetryTick, startCamera, stopEverything])
 
   const handleClose = () => {
     stopEverything()
@@ -358,16 +414,15 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
     if (!next?.deviceId) return
     stopEverything()
     cancelledRef.current = false
+    setTorchOn(false)
+    setScannedPreview(null)
+    scanningLockRef.current = false
+    setPhase('starting')
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      await acquireCamera({
         video: { deviceId: { exact: next.deviceId } },
         audio: false,
       })
-      if (cancelledRef.current) {
-        stream.getTracks().forEach((t) => t.stop())
-        return
-      }
-      await attachStream(stream)
     } catch (e) {
       if (cancelledRef.current) return
       const { message, phase: errPhase } = classifyCameraError(e)
@@ -376,7 +431,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
     }
   }
 
-  const handleSubmitManual = () => {
+  const handleSubmitManual = async () => {
     const code = manualCode.trim()
     if (!code) return
     const digits = code.replace(/\D/g, '')
@@ -384,8 +439,20 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
       notifications.show({ message: 'El código debe tener al menos 6 dígitos', color: 'red' })
       return
     }
-    stopEverything()
-    onScanRef.current(digits)
+    let ok = false
+    try {
+      ok = await onScanRef.current(digits)
+    } catch {
+      ok = false
+    }
+    if (ok) {
+      stopEverything()
+    } else {
+      // Manual lookup failed: restart the camera for another try.
+      stopEverything()
+      pendingRestartRef.current = true
+      setScanRetryTick((t) => t + 1)
+    }
   }
 
   const showVideo = phase === 'scanning'

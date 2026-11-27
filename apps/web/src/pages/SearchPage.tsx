@@ -42,8 +42,9 @@ export function SearchPage() {
   }, [cimaDetail, lotModal])
 
   // Handle barcode scan result — a one-shot mutation per scan keeps the
-  // scanner in control of its own feedback state (mobile parity).
-  const handleScan = async (barcode: string) => {
+  // scanner in control of its own feedback state (mobile parity). Returns
+  // false on failure so the scanner restarts its camera instead of dying.
+  const handleScan = async (barcode: string): Promise<boolean> => {
     try {
       const result = await barcodeLookup.mutateAsync(barcode)
       setLotForm({ quantity: 0, daily_dose: '', expiry_date: null })
@@ -58,12 +59,14 @@ export function SearchPage() {
         },
       })
       setScannerOpen(false)
+      return true
     } catch (err) {
       const message = err instanceof Error && err.message ? err.message : 'CN no encontrado'
       notifications.show({
         message: `No se encontró el medicamento en CIMA: ${message}`,
         color: 'red',
       })
+      return false
     }
   }
 
