@@ -23,12 +23,17 @@ export function AddLotModal({ visible, medicationId, medicationName, onClose }: 
 
   const [quantity, setQuantity] = useState('');
   const [dailyDose, setDailyDose] = useState('');
+  const [treatmentDays, setTreatmentDays] = useState('');
+  const [doseStartDate, setDoseStartDate] = useState<Date | null>(null);
   const [expiryDate, setExpiryDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerTarget, setDatePickerTarget] = useState<'dose' | 'expiry'>('expiry');
 
   const handleClose = useCallback(() => {
     setQuantity('');
     setDailyDose('');
+    setTreatmentDays('');
+    setDoseStartDate(null);
     setExpiryDate(null);
     setShowDatePicker(false);
     onClose();
@@ -42,6 +47,10 @@ export function AddLotModal({ visible, medicationId, medicationName, onClose }: 
           medication_id: medId,
           quantity: Number(quantity) || 0,
           daily_dose: dailyDose ? Number(dailyDose) : null,
+          treatment_days: treatmentDays ? Number(treatmentDays) : null,
+          dose_start_date: doseStartDate
+            ? `${doseStartDate.getFullYear()}-${String(doseStartDate.getMonth() + 1).padStart(2, '0')}-${String(doseStartDate.getDate()).padStart(2, '0')}`
+            : null,
           expiry_date: expiryDate ? expiryDate.toISOString() : null,
         }),
       }),
@@ -91,11 +100,35 @@ export function AddLotModal({ visible, medicationId, medicationName, onClose }: 
                     placeholder="Ej: 2 (comprimidos al día)"
                     style={styles.input}
                   />
+                  <TextInput
+                    label="Duración del tratamiento en días (opcional)"
+                    value={treatmentDays}
+                    onChangeText={(t) => setTreatmentDays(t.replace(/[^0-9.]/g, ''))}
+                    mode="outlined"
+                    keyboardType="numeric"
+                    placeholder="Ej: 5"
+                    style={styles.input}
+                  />
+                  <View style={styles.dateRow}>
+                    <Paragraph style={styles.dateLabel}>Inicio de la toma:</Paragraph>
+                    <Button
+                      mode="outlined"
+                      onPress={() => { setDatePickerTarget('dose'); setShowDatePicker(true); }}
+                      style={styles.dateButton}
+                    >
+                      {doseStartDate
+                        ? doseStartDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : 'Seleccionar'}
+                    </Button>
+                    {doseStartDate && (
+                      <IconButton icon="close" size={18} onPress={() => setDoseStartDate(null)} />
+                    )}
+                  </View>
                   <View style={styles.dateRow}>
                     <Paragraph style={styles.dateLabel}>Caducidad:</Paragraph>
                     <Button
                       mode="outlined"
-                      onPress={() => setShowDatePicker(true)}
+                      onPress={() => { setDatePickerTarget('expiry'); setShowDatePicker(true); }}
                       style={styles.dateButton}
                     >
                       {expiryDate
@@ -109,15 +142,18 @@ export function AddLotModal({ visible, medicationId, medicationName, onClose }: 
                   {showDatePicker && (
                     <View>
                       <RNDateTimePicker
-                        value={expiryDate ?? new Date()}
+                        value={(datePickerTarget === 'dose' ? doseStartDate : expiryDate) ?? new Date()}
                         mode="date"
                         display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                        minimumDate={new Date()}
+                        minimumDate={datePickerTarget === 'expiry' ? new Date() : undefined}
                         onChange={(_, date) => {
                           if (Platform.OS === 'android') {
                             setShowDatePicker(false);
                           }
-                          if (date) setExpiryDate(date);
+                          if (date) {
+                            if (datePickerTarget === 'dose') setDoseStartDate(date);
+                            else setExpiryDate(date);
+                          }
                         }}
                       />
                       {Platform.OS === 'ios' && (
