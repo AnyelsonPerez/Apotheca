@@ -113,6 +113,8 @@ export interface LotInput {
   expiry_date?: string | null
   dosage?: string | null
   daily_dose?: number | null
+  treatment_days?: number | null
+  dose_start_date?: string | null
   acquired_at?: string | null
 }
 

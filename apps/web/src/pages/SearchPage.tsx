@@ -13,6 +13,11 @@ function parsePresentationQty(nombre: string): number | null {
   return match ? parseInt(match[1], 10) : null
 }
 
+/** Format a Date as YYYY-MM-DD using local components (avoids toISOString UTC off-by-one). */
+function formatLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function SearchPage() {
   const [query, setQuery] = useState('')
   const { data, isFetching } = useCimaSearch(query)
@@ -25,7 +30,13 @@ export function SearchPage() {
 
   // Lot modal state — the medication is only saved when the user hits "Guardar"
   const [lotModal, setLotModal] = useState<{ med: CimaSearchResult } | null>(null)
-  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', expiry_date: null as string | Date | null })
+  const [lotForm, setLotForm] = useState({
+    quantity: 0,
+    daily_dose: '',
+    treatment_days: '',
+    dose_start_date: null as string | Date | null,
+    expiry_date: null as string | Date | null,
+  })
   const createLot = useCreateLot()
   const { data: cimaDetail, isFetching: detailLoading } = useCimaDetail(lotModal?.med.nregistro ?? null)
 
@@ -57,7 +68,7 @@ export function SearchPage() {
           cpresc: barcodeResult.cpresc,
         },
       })
-      setLotForm({ quantity: 0, daily_dose: '', expiry_date: null })
+      setLotForm({ quantity: 0, daily_dose: '', treatment_days: '', dose_start_date: null, expiry_date: null })
       setScannedCn(null)
       setScannerOpen(false)
     } else if (barcodeError) {
@@ -70,7 +81,7 @@ export function SearchPage() {
   }, [scannedCn, barcodeResult, barcodeError, barcodeErrMsg])
 
   const handleAdd = (r: CimaSearchResult) => {
-    setLotForm({ quantity: 0, daily_dose: '', expiry_date: null })
+    setLotForm({ quantity: 0, daily_dose: '', treatment_days: '', dose_start_date: null, expiry_date: null })
     setLotModal({ med: r })
   }
 
@@ -82,7 +93,9 @@ export function SearchPage() {
         medication_id: med.id,
         quantity: lotForm.quantity,
         daily_dose: lotForm.daily_dose ? Number(lotForm.daily_dose) : null,
-        expiry_date: lotForm.expiry_date ? new Date(lotForm.expiry_date).toISOString() : null,
+        treatment_days: lotForm.treatment_days ? Number(lotForm.treatment_days) : null,
+        dose_start_date: lotForm.dose_start_date ? formatLocalDate(new Date(lotForm.dose_start_date)) : null,
+        expiry_date: lotForm.expiry_date ? formatLocalDate(new Date(lotForm.expiry_date)) : null,
       })
       notifications.show({ message: 'Lote guardado', color: 'green' })
       setLotModal(null)
@@ -222,6 +235,20 @@ export function SearchPage() {
             placeholder="2.5"
             value={lotForm.daily_dose}
             onChange={(e) => setLotForm({ ...lotForm, daily_dose: e.target.value })}
+          />
+          <TextInput
+            label="Duración del tratamiento (días)"
+            placeholder="5"
+            value={lotForm.treatment_days}
+            onChange={(e) => setLotForm({ ...lotForm, treatment_days: e.target.value })}
+          />
+          <DateInput
+            label="Fecha de inicio de la toma"
+            placeholder="Cuándo empezaste a tomarlo"
+            valueFormat="DD/MM/YYYY"
+            value={lotForm.dose_start_date}
+            onChange={(v) => setLotForm({ ...lotForm, dose_start_date: v })}
+            clearable
           />
           <Button color="teal" loading={addMedication.isPending || createLot.isPending} onClick={handleCreateLot}>
             Guardar

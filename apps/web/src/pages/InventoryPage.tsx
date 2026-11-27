@@ -28,6 +28,11 @@ function isExpiringSoon(dateStr: string): boolean {
   return days <= 30
 }
 
+/** Format a Date as YYYY-MM-DD using local components (avoids toISOString UTC off-by-one). */
+function formatLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function InventoryPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const filter: FilterType = searchParams.get('filter') === 'expiry' || searchParams.get('filter') === 'depletion'
@@ -42,12 +47,18 @@ export function InventoryPage() {
   const updateLot = useUpdateLot()
   const [modalMed, setModalMed] = useState<InventoryItem | null>(null)
   const [editingLot, setEditingLot] = useState<Lot | null>(null)
-  const [lotForm, setLotForm] = useState({ quantity: 0, daily_dose: '', expiry_date: null as string | Date | null })
+  const [lotForm, setLotForm] = useState({
+    quantity: 0,
+    daily_dose: '',
+    treatment_days: '',
+    dose_start_date: null as string | Date | null,
+    expiry_date: null as string | Date | null,
+  })
 
   const openLotModal = (med: InventoryItem) => {
     setModalMed(med)
     setEditingLot(null)
-    setLotForm({ quantity: 0, daily_dose: '', expiry_date: null })
+    setLotForm({ quantity: 0, daily_dose: '', treatment_days: '', dose_start_date: null, expiry_date: null })
   }
 
   const openEditLotModal = (med: InventoryItem, lot: Lot) => {
@@ -56,6 +67,8 @@ export function InventoryPage() {
     setLotForm({
       quantity: lot.quantity,
       daily_dose: lot.daily_dose != null ? String(lot.daily_dose) : '',
+      treatment_days: lot.treatment_days != null ? String(lot.treatment_days) : '',
+      dose_start_date: lot.dose_start_date ? new Date(lot.dose_start_date) : null,
       expiry_date: lot.expiry_date ? new Date(lot.expiry_date) : null,
     })
   }
@@ -70,7 +83,9 @@ export function InventoryPage() {
     const lotData = {
       quantity: lotForm.quantity,
       daily_dose: lotForm.daily_dose ? Number(lotForm.daily_dose) : null,
-      expiry_date: lotForm.expiry_date ? new Date(lotForm.expiry_date).toISOString() : null,
+      treatment_days: lotForm.treatment_days ? Number(lotForm.treatment_days) : null,
+      dose_start_date: lotForm.dose_start_date ? formatLocalDate(new Date(lotForm.dose_start_date)) : null,
+      expiry_date: lotForm.expiry_date ? formatLocalDate(new Date(lotForm.expiry_date)) : null,
     }
     try {
       if (editingLot) {
@@ -159,7 +174,11 @@ export function InventoryPage() {
             </Table.Td>
             <Table.Td></Table.Td>
             <Table.Td><Badge size="xs" variant="light">{lot.quantity}</Badge></Table.Td>
-            <Table.Td>{lot.daily_dose ? `${lot.daily_dose}/día` : '—'}</Table.Td>
+            <Table.Td>
+              {lot.daily_dose
+                ? `${lot.daily_dose}/día${lot.treatment_days ? ` × ${lot.treatment_days}d` : ''}${lot.effective_quantity != null && lot.effective_quantity !== lot.quantity ? ` (quedan ${lot.effective_quantity})` : ''}`
+                : '—'}
+            </Table.Td>
             <Table.Td>
               <Group gap="xs">
                 <ActionIcon variant="subtle" color="blue" size="sm" onClick={() => openEditLotModal(med, lot)}>
@@ -243,6 +262,20 @@ export function InventoryPage() {
             placeholder="2.5"
             value={lotForm.daily_dose}
             onChange={(e) => setLotForm({ ...lotForm, daily_dose: e.target.value })}
+          />
+          <TextInput
+            label="Duración del tratamiento (días)"
+            placeholder="5"
+            value={lotForm.treatment_days}
+            onChange={(e) => setLotForm({ ...lotForm, treatment_days: e.target.value })}
+          />
+          <DateInput
+            label="Fecha de inicio de la toma"
+            placeholder="Cuándo empezaste a tomarlo"
+            valueFormat="DD/MM/YYYY"
+            value={lotForm.dose_start_date}
+            onChange={(v) => setLotForm({ ...lotForm, dose_start_date: v })}
+            clearable
           />
           <Button color="teal" loading={createLot.isPending || updateLot.isPending} onClick={handleSaveLot}>
             {editingLot ? 'Guardar cambios' : 'Guardar lote'}
