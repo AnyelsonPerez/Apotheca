@@ -3,22 +3,25 @@ import { View, Text, StyleSheet, Pressable, Linking, Alert } from 'react-native'
 import { Camera, useCameraDevice, useCameraPermission, useCodeScanner } from 'react-native-vision-camera';
 import { Card, Button, Title, Paragraph, ActivityIndicator, IconButton } from 'react-native-paper';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useIsFocused } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { apiFetch } from '@/api/client';
 import type { Medication, CimaBarcodeResult } from '@/api/types';
 import { useToast } from '@/hooks/use-toast';
 import { ToastSnackbar } from '@/components/ToastSnackbar';
+import { AddLotModal } from '@/components/AddLotModal';
 import { BrandColors } from '@/constants/theme';
 
 export default function ScannerScreen() {
   const { hasPermission, requestPermission } = useCameraPermission();
   const router = useRouter();
+  const isFocused = useIsFocused();
   const [scannedCode, setScannedCode] = useState<string | null>(null);
   const [searchResult, setSearchResult] = useState<CimaBarcodeResult | null>(null);
   const [searching, setSearching] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [permissionRequested, setPermissionRequested] = useState(false);
+  const [pendingMed, setPendingMed] = useState<Medication | null>(null);
   const device = useCameraDevice('back');
   const qc = useQueryClient();
   const isScanningRef = useRef(false);
@@ -62,7 +65,7 @@ export default function ScannerScreen() {
         setScannedCode(value);
         // Brief delay so the user can see the scanned code before lookup
         setTimeout(() => {
-          if (isScanningRef.current && scannedCode === value) {
+          if (isScanningRef.current) {
             searchByBarcode(value);
           }
         }, 300);
@@ -82,11 +85,10 @@ export default function ScannerScreen() {
         method: 'POST',
         body: JSON.stringify({ nregistro }),
       }),
-    onSuccess: async () => {
+    onSuccess: async (med: Medication) => {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       qc.invalidateQueries({ queryKey: ['inventory'] });
-      show('Medicamento añadido al inventario');
-      reset();
+      setPendingMed(med);  // Open the lot modal — don't call reset() yet
     },
     onError: async (err) => {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -186,6 +188,15 @@ export default function ScannerScreen() {
             )}
           </Card.Actions>
         </Card>
+        <AddLotModal
+          visible={!!pendingMed}
+          medicationId={pendingMed?.id ?? null}
+          medicationName={pendingMed?.name ?? null}
+          onClose={() => {
+            setPendingMed(null);
+            reset();
+          }}
+        />
         <ToastSnackbar toast={toast} onDismiss={hide} />
       </View>
     );
@@ -195,7 +206,7 @@ export default function ScannerScreen() {
     <View style={styles.cameraContainer}>
       <Camera
         device={device}
-        isActive={true}
+        isActive={isFocused && !scannedCode && !pendingMed}
         torch={torchOn ? 'on' : 'off'}
         codeScanner={codeScanner}
         style={StyleSheet.absoluteFill}
