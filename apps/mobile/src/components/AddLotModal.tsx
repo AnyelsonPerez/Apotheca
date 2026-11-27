@@ -15,10 +15,9 @@ export interface AddLotModalProps {
   medicationId: string | null;
   medicationName: string | null;
   onClose: () => void;
-  onCreated?: () => void;
 }
 
-export function AddLotModal({ visible, medicationId, medicationName, onClose, onCreated }: AddLotModalProps) {
+export function AddLotModal({ visible, medicationId, medicationName, onClose }: AddLotModalProps) {
   const qc = useQueryClient();
   const { toast, show, hide } = useToast();
 
@@ -51,7 +50,6 @@ export function AddLotModal({ visible, medicationId, medicationName, onClose, on
       qc.invalidateQueries({ queryKey: ['inventory'] });
       qc.invalidateQueries({ queryKey: ['alerts'] });
       show('Lote añadido correctamente');
-      onCreated?.();
       handleClose();
     },
     onError: async (err) => {

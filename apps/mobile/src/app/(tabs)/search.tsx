@@ -110,6 +110,7 @@ export default function SearchScreen() {
       }),
     onSuccess: async (med: Medication) => {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      qc.invalidateQueries({ queryKey: ['inventory'] });
       qc.invalidateQueries({ queryKey: ['cima'] });
       setAddingNregistro(null);
       setPendingMed(med);
