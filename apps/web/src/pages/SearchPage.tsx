@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Badge, Button, Card, Group, Loader, Modal, NumberInput, Stack, Text, TextInput, ActionIcon, Tooltip } from '@mantine/core'
 import { DateInput } from '@mantine/dates'
-import { useMediaQuery } from '@mantine/hooks'
 import { IconSearch, IconPlus, IconCheck, IconBarcode } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
 import { useAddMedication, useCimaDetail, useCimaSearch, useCimaBarcode, useCreateLot } from '../api/hooks'
@@ -18,7 +17,6 @@ export function SearchPage() {
   const [query, setQuery] = useState('')
   const { data, isFetching } = useCimaSearch(query)
   const addMedication = useAddMedication()
-  const isMobile = useMediaQuery('(max-width: 768px)')
 
   // Barcode scanner state
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -146,27 +144,23 @@ export function SearchPage() {
           onChange={(e) => setQuery(e.target.value)}
           style={{ flex: 1 }}
         />
-        {isMobile && (
-          <Tooltip label="Escanear código de barras">
-            <ActionIcon
-              variant="light"
-              color="teal"
-              size="lg"
-              onClick={() => setScannerOpen(true)}
-              aria-label="Escanear código de barras"
-            >
-              <IconBarcode size={20} />
-            </ActionIcon>
-          </Tooltip>
-        )}
+        <Tooltip label="Escanear código de barras">
+          <ActionIcon
+            variant="light"
+            color="teal"
+            size="lg"
+            onClick={() => setScannerOpen(true)}
+            aria-label="Escanear código de barras"
+          >
+            <IconBarcode size={20} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
-      {isMobile && (
-        <BarcodeScannerModal
-          opened={scannerOpen}
-          onClose={() => setScannerOpen(false)}
-          onScan={(code) => setScannedCn(code)}
-        />
-      )}
+      <BarcodeScannerModal
+        opened={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={(code) => setScannedCn(code)}
+      />
       <Stack gap="xs">
         {isFetching && <Text c="dimmed">Buscando…</Text>}
 

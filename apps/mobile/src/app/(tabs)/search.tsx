@@ -8,6 +8,7 @@ import type { CimaSearchResult, Medication, CimaSearchResponse } from '@/api/typ
 import { useDebounce } from '@/hooks/use-debounce';
 import { useToast } from '@/hooks/use-toast';
 import { ToastSnackbar } from '@/components/ToastSnackbar';
+import { AddLotModal } from '@/components/AddLotModal';
 import { ErrorView } from '@/components/ErrorView';
 import { BrandColors } from '@/constants/theme';
 
@@ -24,6 +25,9 @@ export default function SearchScreen() {
   const isTyping = query !== debouncedQuery;
   const qc = useQueryClient();
   const { toast, show, hide } = useToast();
+
+  const [pendingMed, setPendingMed] = useState<Medication | null>(null);
+  const [addingNregistro, setAddingNregistro] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
 
@@ -104,14 +108,16 @@ export default function SearchScreen() {
         method: 'POST',
         body: JSON.stringify({ nregistro }),
       }),
-    onSuccess: async () => {
+    onSuccess: async (med: Medication) => {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       qc.invalidateQueries({ queryKey: ['inventory'] });
       qc.invalidateQueries({ queryKey: ['cima'] });
-      show('Medicamento añadido al inventario');
+      setAddingNregistro(null);
+      setPendingMed(med);
     },
     onError: async (err) => {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setAddingNregistro(null);
       show(String(err.message), 'error');
     },
   });
@@ -173,9 +179,12 @@ export default function SearchScreen() {
                   <Button
                     mode="contained"
                     buttonColor={BrandColors.primary}
-                    onPress={() => addMutation.mutate(item.nregistro)}
-                    loading={addMutation.isPending}
-                    disabled={alreadyAdded}
+                    onPress={() => {
+                      setAddingNregistro(item.nregistro);
+                      addMutation.mutate(item.nregistro);
+                    }}
+                    loading={addMutation.isPending && addingNregistro === item.nregistro}
+                    disabled={alreadyAdded || (addMutation.isPending && addingNregistro === item.nregistro)}
                   >
                     {alreadyAdded ? 'Añadido' : 'Añadir al inventario'}
                   </Button>
@@ -197,6 +206,13 @@ export default function SearchScreen() {
       )}
 
       <ToastSnackbar toast={toast} onDismiss={hide} />
+
+      <AddLotModal
+        visible={!!pendingMed}
+        medicationId={pendingMed?.id ?? null}
+        medicationName={pendingMed?.name ?? null}
+        onClose={() => setPendingMed(null)}
+      />
     </View>
   );
 }

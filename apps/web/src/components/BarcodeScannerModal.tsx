@@ -22,7 +22,31 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
     setError(null)
     setScanning(true)
 
+    // Secure context check — getUserMedia requires HTTPS or localhost
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      setError('Se requiere conexión HTTPS para usar la cámara. Si estás en desarrollo, usa localhost.')
+      setScanning(false)
+      return
+    }
+
     const reader = new BrowserMultiFormatReader()
+
+    /** Map a camera error to a user-friendly Spanish message. */
+    function classifyCameraError(e: unknown): string {
+      if (e instanceof DOMException) {
+        switch (e.name) {
+          case 'NotAllowedError':
+            return 'Permiso de cámara denegado. Habilítalo en la configuración del navegador.'
+          case 'NotFoundError':
+            return 'No se encontró ninguna cámara en este dispositivo.'
+          case 'NotReadableError':
+            return 'La cámara está siendo usada por otra aplicación.'
+          default:
+            return e.message || 'No se pudo acceder a la cámara'
+        }
+      }
+      return e instanceof Error ? e.message : 'No se pudo acceder a la cámara'
+    }
 
     reader
       .decodeFromVideoDevice(undefined, videoRef.current!, (result) => {
@@ -46,7 +70,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
       })
       .catch((e: unknown) => {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'No se pudo acceder a la cámara')
+          setError(classifyCameraError(e))
           setScanning(false)
         }
       })
