@@ -114,6 +114,14 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
   const [manualCode, setManualCode] = useState('')
   // Bumped to re-run the camera effect after a failed lookup.
   const [scanRetryTick, setScanRetryTick] = useState(0)
+  // Mirrors `phase` for async handlers that must read the live value.
+  const phaseRef = useRef<ScannerPhase>('starting')
+
+  /** setPhase that keeps phaseRef in sync for async readers. */
+  const transitionPhase = useCallback((next: ScannerPhase) => {
+    phaseRef.current = next
+    setPhase(next)
+  }, [])
 
   const isMobile = useMediaQuery('(max-width: 620px)')
 
@@ -218,7 +226,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
         .catch(() => {
           if (!cancelledRef.current) {
             setErrorMsg('No se pudo iniciar el lector de códigos.')
-            setPhase('error')
+            transitionPhase('error')
           }
         })
     },
@@ -300,7 +308,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
       const track = stream.getVideoTracks()[0]
       const caps = track?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined
       setTorchAvailable(!!caps?.torch)
-      setPhase('scanning')
+      transitionPhase('scanning')
       startDecoding(video)
     },
     [startDecoding],
@@ -326,7 +334,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
     stopEverything()
     cancelledRef.current = false
     const runId = runIdRef.current
-    setPhase('starting')
+    transitionPhase('starting')
     setErrorMsg('')
     setScannedPreview(null)
     setTorchOn(false)
@@ -334,11 +342,11 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
 
     // Secure context check — getUserMedia requires HTTPS or localhost.
     if (typeof window !== 'undefined' && !window.isSecureContext) {
-      setPhase('insecure')
+      transitionPhase('insecure')
       return
     }
     if (!navigator.mediaDevices?.getUserMedia) {
-      setPhase('insecure')
+      transitionPhase('insecure')
       return
     }
 
@@ -366,9 +374,9 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
       if (runId !== runIdRef.current) return
       const { message, phase: errPhase } = classifyCameraError(e)
       setErrorMsg(message)
-      setPhase(errPhase)
+      transitionPhase(errPhase)
     }
-  }, [acquireCamera, stopEverything])
+  }, [acquireCamera, stopEverything, transitionPhase])
 
   // Camera lifecycle: tied to `opened` plus the retry tick — a failed
   // lookup bumps the tick to restart the stream in place.
@@ -417,7 +425,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
     setTorchOn(false)
     setScannedPreview(null)
     scanningLockRef.current = false
-    setPhase('starting')
+    transitionPhase('starting')
     try {
       await acquireCamera({
         video: { deviceId: { exact: next.deviceId } },
@@ -428,7 +436,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
       if (runId !== runIdRef.current) return
       const { message, phase: errPhase } = classifyCameraError(e)
       setErrorMsg(message)
-      setPhase(errPhase)
+      transitionPhase(errPhase)
     }
   }
 
@@ -450,7 +458,7 @@ export function BarcodeScannerModal({ opened, onClose, onScan }: BarcodeScannerM
     }
     if (ok) {
       stopEverything()
-    } else if (phase === 'scanning') {
+    } else if (phaseRef.current === 'scanning') {
       // Manual lookup failed with a live camera: restart it for another try.
       stopEverything()
       setScanRetryTick((t) => t + 1)
