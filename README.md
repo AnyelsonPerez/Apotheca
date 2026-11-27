@@ -3,9 +3,11 @@
 Apotheca is a self-hosted pharmacy management system for home use.
 
 - Search medications by brand name or active ingredient against the official AEMPS CIMA catalog
-- Lot-based inventory with quantity, expiration date, and daily dose
+- Lot-based inventory with quantity, expiration date, and daily dose with treatment duration
 - Auto-fill lot quantity from CIMA pharmaceutical presentations
-- Expiration and stock depletion alerts
+- Virtual daily-dose consumption: stock is automatically discounted each day from the start date, capped at the treatment duration
+- Optional daily dose: medications that nobody is taking don't generate depletion alerts
+- Expiration and stock depletion alerts with progressive remaining-stock calculation
 - Web app (React + Mantine) and Android app (React Native + Expo)
 
 ## Quick Start

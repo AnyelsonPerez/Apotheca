@@ -14,8 +14,15 @@ activo, forma farmacéutica, receta) y guarda en BD con cache del JSON completo.
 Permite crear lotes con:
 - cantidad (entero ≥ 0)
 - fecha de caducidad (opcional)
-- posología (texto libre, opcional)
-- dosis diaria (decimal, opcional, para cálculo de agotamiento)
+- dosis diaria X (decimal, opcional, para cálculo de agotamiento)
+- duración del tratamiento Y días (decimal, opcional)
+- fecha de inicio de la toma (opcional)
+
+La dosis diaria es opcional: hay medicamentos que no está tomando nadie.
+Cuando se añade un medicamento, se ofrece indicar la dosis diaria, la
+duración del tratamiento (Y días) y una fecha de inicio para empezar a
+descontar. Esto cubre el caso de registrar el medicamento días después de
+empezar a tomarlo.
 
 ### UC3 Caducidad
 Threshold global configurable (days_until_expiry). Cuando un lote está dentro
@@ -23,8 +30,19 @@ del threshold, aparece en GET /alerts. Notificación ntfy automática si ya
 caducó.
 
 ### UC4 Agotamiento
-Cálculo: days_left = quantity / daily_dose. Si days_left ≤ threshold, aparece
-en GET /alerts. Notificación ntfy automática si days_left ≤ 2.
+Cálculo con descuento virtual progresivo: cada día se descuenta daily_dose
+de la cantidad a partir de dose_start_date, durante treatment_days. Cuando
+pasan los treatment_days, se deja de descontar (el tratamiento ha terminado).
+- effective_quantity = quantity − (daily_dose × min(días_transcurridos, treatment_days))
+- days_left = effective_quantity / daily_dose
+
+Si days_left ≤ threshold, aparece en GET /alerts. Notificación ntfy
+automática si days_left ≤ 2. La cantidad física (quantity) no se modifica,
+el descuento es virtual (calculado en cada lectura).
+
+La dosis diaria es opcional: un lote sin dosis no genera alerta de
+agotamiento. Si falta fecha de inicio, no se descuenta nada (la dosis existe
+pero el tratamiento no ha empezado).
 
 ### UC5 Configuración
 - expiry_warning_days (default: 30)
