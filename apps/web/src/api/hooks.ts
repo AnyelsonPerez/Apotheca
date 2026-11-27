@@ -54,13 +54,11 @@ export function useCimaDetail(nregistro: string | null) {
   })
 }
 
-// --- Barcode lookup (CIMA by codigo nacional) ---
-export function useCimaBarcode(cn: string | null) {
-  return useQuery({
-    queryKey: ['cima-barcode', cn],
-    queryFn: () => apiFetch<CimaBarcodeResult>(`/cima/barcode/${cn}`),
-    enabled: !!cn,
-    retry: 0,
+// --- Barcode lookup (CIMA by codigo nacional) — one-shot action per scan ---
+export function useCimaBarcodeLookup() {
+  return useMutation({
+    mutationFn: (barcode: string) =>
+      apiFetch<CimaBarcodeResult>(`/cima/barcode/${encodeURIComponent(barcode)}`),
   })
 }
 
