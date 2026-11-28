@@ -37,3 +37,10 @@ packages = ["src/apotheca_api"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src/apotheca_api"]
+branch = true
+
+[tool.coverage.xml]
+output = "coverage.xml"
