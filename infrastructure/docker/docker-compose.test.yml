@@ -5,7 +5,9 @@
 services:
   api:
     # Override: no persistent volume, ephemeral DB
-    volumes: []
+    volumes:
+      # Mount e2e fixtures so the seed script can run inside the container
+      - ../../e2e:/app/e2e:ro
     environment:
       - APOTHECA_DATABASE_PATH=/tmp/apotheca-test.db
       - APOTHECA_JWT_SECRET=e2e-test-secret-32bytes-changeme!!  # 32+ bytes
