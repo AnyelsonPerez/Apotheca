@@ -98,4 +98,7 @@ export interface CimaBarcodeResult {
   labtitular: string
   cpresc: string
   dosis: string
+  in_inventory: boolean
+  medication_id: string | null
+  total_quantity: number
 }

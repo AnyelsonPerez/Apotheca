@@ -139,6 +139,11 @@ export default function ScannerScreen() {
             {searchResult && (
               <View style={styles.resultInfo}>
                 <Title style={styles.medName}>{searchResult.nombre}</Title>
+                {searchResult.in_inventory ? (
+                  <View style={styles.inventoryBadge}>
+                    <Text style={styles.inventoryBadgeText}>✓ En inventario · {searchResult.total_quantity} ud.</Text>
+                  </View>
+                ) : null}
                 <Paragraph>{searchResult.pactivos}</Paragraph>
                 <Paragraph style={styles.lab}>{searchResult.labtitular}</Paragraph>
               </View>
@@ -278,6 +283,16 @@ const styles = StyleSheet.create({
   loader: { marginTop: 16 },
   resultInfo: { marginTop: 12 },
   medName: { fontSize: 16 },
+  inventoryBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: BrandColors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  inventoryBadgeText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
   lab: { opacity: 0.6, marginTop: 4 },
   notFound: { color: BrandColors.danger, marginTop: 8 },
   manualButton: { marginTop: 12 },
