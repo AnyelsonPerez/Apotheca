@@ -177,7 +177,7 @@ def get_inventory(db: Session = Depends(get_db), user: User = Depends(get_curren
                 active_ingredient_name=med.active_ingredient.name if med.active_ingredient else None,
                 presentation_name=med.presentation.name if med.presentation else None,
                 total_quantity=total_quantity,
-                lots=user_lots,
+                lots=[LotResponse.model_validate(lot) for lot in user_lots],
             )
         )
     return result

@@ -28,6 +28,7 @@ async def search_medications(
         )
 
     query_term = nombre or pactivos
+    assert query_term is not None  # narrowing: at least one is set (checked above)
     words = query_term.lower().split()
     cima_term = words[0]  # CIMA only supports single-word search
 

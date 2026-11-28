@@ -57,7 +57,7 @@ export function SearchPage() {
           dosis: result.dosis,
           cpresc: result.cpresc,
           in_inventory: result.in_inventory,
-          medication_id: result.medication_id,
+          medication_id: result.medication_id ?? undefined,
         },
       })
       setScannerOpen(false)
