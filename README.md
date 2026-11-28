@@ -5,9 +5,11 @@ Apotheca is a self-hosted pharmacy management system for home use.
 - Search medications by brand name or active ingredient against the official AEMPS CIMA catalog
 - Scan medication barcodes (EAN-13) for instant CIMA lookup — the system extracts the 6-digit código nacional (CN) from positions 7-12 of the barcode
 - See at a glance whether a scanned medicine is already in your inventory, with total stock quantity
-- Lot-based inventory with quantity, expiration date, and daily dose
+- Lot-based inventory with quantity, expiration date, daily dose, and treatment duration
 - Auto-fill lot quantity from CIMA pharmaceutical presentations
-- Expiration and stock depletion alerts
+- Virtual daily-dose consumption: stock is automatically discounted each day from the start date, capped at the treatment duration
+- Optional daily dose: medications that nobody is taking don't generate depletion alerts
+- Expiration and stock depletion alerts with progressive remaining-stock calculation
 - Web app (React + Mantine) and Android app (React Native + Expo)
 
 ## Quick Start

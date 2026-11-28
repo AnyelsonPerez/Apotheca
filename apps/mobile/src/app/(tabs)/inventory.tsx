@@ -104,7 +104,9 @@ export default function InventoryScreen() {
                     <View style={styles.lotInfo}>
                       <Paragraph style={styles.lotText}>
                         Lote #{lotIndex + 1} — {lot.quantity} u
-                        {lot.daily_dose ? ` — ${lot.daily_dose}/día` : ''}
+                        {lot.daily_dose
+                          ? ` — ${lot.daily_dose}/día${lot.treatment_days ? ` × ${lot.treatment_days}d` : ''}${lot.effective_quantity != null && lot.effective_quantity !== lot.quantity ? ` (quedan ${lot.effective_quantity})` : ''}`
+                          : ''}
                       </Paragraph>
                       {expiry && (
                         <Paragraph style={[

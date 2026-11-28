@@ -1,12 +1,13 @@
 """Integration tests for the alerts router: expiry and depletion calculation."""
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from apotheca_api.cima import get_cima_client
 from apotheca_api.app import app
 from apotheca_api.models import Lot, Medication, User
 
 
-def _create_med_and_lot(db_session, user_id, quantity=10, expiry_date=None, daily_dose=None):
+def _create_med_and_lot(db_session, user_id, quantity=10, expiry_date=None, daily_dose=None,
+                        treatment_days=None, dose_start_date=None):
     """Create a medication + lot directly in the DB."""
     med = Medication(
         national_code="TEST001",
@@ -35,6 +36,8 @@ def _create_med_and_lot(db_session, user_id, quantity=10, expiry_date=None, dail
         quantity=quantity,
         expiry_date=expiry_date,
         daily_dose=daily_dose,
+        treatment_days=treatment_days,
+        dose_start_date=dose_start_date,
     )
     db_session.add(lot)
     db_session.commit()
@@ -92,8 +95,12 @@ class TestExpiryAlerts:
 class TestDepletionAlerts:
     def test_depletion_alert_when_low_days_left(self, seeded_client, auth_headers, db_session):
         user_id = _get_user_id(db_session)
-        # 5 units / 1.0 daily dose = 5 days left (< 7-day threshold)
-        _create_med_and_lot(db_session, user_id, quantity=5, daily_dose=1.0)
+        # 5 units / 1.0 daily dose, started today = 5 days left (< 7-day threshold)
+        _create_med_and_lot(
+            db_session, user_id,
+            quantity=5, daily_dose=1.0,
+            dose_start_date=date.today(),
+        )
         res = seeded_client.get("/api/alerts", headers=auth_headers)
         body = res.json()
         assert len(body["depletion"]) == 1
@@ -103,7 +110,11 @@ class TestDepletionAlerts:
     def test_no_depletion_alert_when_plenty_of_stock(self, seeded_client, auth_headers, db_session):
         user_id = _get_user_id(db_session)
         # 100 units / 1.0 = 100 days left (> 7-day threshold)
-        _create_med_and_lot(db_session, user_id, quantity=100, daily_dose=1.0)
+        _create_med_and_lot(
+            db_session, user_id,
+            quantity=100, daily_dose=1.0,
+            dose_start_date=date.today(),
+        )
         res = seeded_client.get("/api/alerts", headers=auth_headers)
         body = res.json()
         assert len(body["depletion"]) == 0
@@ -117,7 +128,11 @@ class TestDepletionAlerts:
 
     def test_no_depletion_alert_when_zero_quantity(self, seeded_client, auth_headers, db_session):
         user_id = _get_user_id(db_session)
-        _create_med_and_lot(db_session, user_id, quantity=0, daily_dose=1.0)
+        _create_med_and_lot(
+            db_session, user_id,
+            quantity=0, daily_dose=1.0,
+            dose_start_date=date.today(),
+        )
         res = seeded_client.get("/api/alerts", headers=auth_headers)
         body = res.json()
         assert len(body["depletion"]) == 0

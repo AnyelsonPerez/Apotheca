@@ -33,6 +33,9 @@ export interface Lot {
   quantity: number
   expiry_date: string | null
   daily_dose: number | null
+  treatment_days: number | null
+  dose_start_date: string | null
+  effective_quantity: number | null
   acquired_at: string | null
   created_at: string
   updated_at: string
@@ -62,6 +65,9 @@ export interface AlertItem {
   quantity: number
   expiry_date: string | null
   daily_dose: number | null
+  treatment_days: number | null
+  dose_start_date: string | null
+  effective_quantity: number | null
   days_until_expiry: number | null
   days_until_depleted: number | null
   alert_type: string

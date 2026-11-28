@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends
@@ -7,7 +7,14 @@ from sqlalchemy.orm import Session
 from apotheca_api.config import settings
 from apotheca_api.database import get_db
 from apotheca_api.deps import get_current_user
-from apotheca_api.models import Lot, Medication, NotificationLog, Settings as SettingsModel, User
+from apotheca_api.models import (
+    Lot,
+    Medication,
+    NotificationLog,
+    Settings as SettingsModel,
+    User,
+    compute_dose_consumption,
+)
 from apotheca_api.schemas_inventory import AlertItem, AlertsResponse
 
 router = APIRouter(prefix="/alerts", tags=["alerts"], dependencies=[Depends(get_current_user)])
@@ -43,6 +50,7 @@ async def get_alerts(db: Session = Depends(get_db), user: User = Depends(get_cur
     depletion_threshold_days = int(_get_setting(db, "depletion_threshold_days", "7"))
 
     now = datetime.now(timezone.utc)
+    today_local = datetime.now().date()
 
     lots = (
         db.query(Lot)
@@ -81,8 +89,14 @@ async def get_alerts(db: Session = Depends(get_db), user: User = Depends(get_cur
                         )
 
         if lot.daily_dose and lot.daily_dose > 0 and lot.quantity > 0:
-            days_left = lot.quantity / lot.daily_dose
-            if days_left <= depletion_threshold_days:
+            effective_qty, days_left, is_consuming = compute_dose_consumption(
+                lot.quantity,
+                lot.daily_dose,
+                lot.treatment_days,
+                lot.dose_start_date,
+                today_local,
+            )
+            if days_left is not None and days_left <= depletion_threshold_days:
                 depletion_alerts.append(
                     AlertItem(
                         lot_id=lot.id,
@@ -90,17 +104,21 @@ async def get_alerts(db: Session = Depends(get_db), user: User = Depends(get_cur
                         national_code=med_code,
                         quantity=lot.quantity,
                         daily_dose=lot.daily_dose,
+                        treatment_days=lot.treatment_days,
+                        dose_start_date=lot.dose_start_date,
+                        effective_quantity=round(effective_qty, 1),
                         days_until_depleted=round(days_left, 1),
                         alert_type="depletion",
                     )
                 )
 
-                med = db.query(Medication).filter(Medication.id == lot.medication_id).first()
-                if med and days_left <= 2:
-                    await _send_ntfy_notification(
-                        db, lot, med,
-                        f" agotándose: {med_name} — {round(days_left, 1)} días restantes",
-                        "depletion",
-                    )
+                if is_consuming:
+                    med = db.query(Medication).filter(Medication.id == lot.medication_id).first()
+                    if med and days_left <= 2:
+                        await _send_ntfy_notification(
+                            db, lot, med,
+                            f" agotándose: {med_name} — {round(days_left, 1)} días restantes ({round(effective_qty, 1)} u)",
+                            "depletion",
+                        )
 
     return AlertsResponse(expiry=expiry_alerts, depletion=depletion_alerts)

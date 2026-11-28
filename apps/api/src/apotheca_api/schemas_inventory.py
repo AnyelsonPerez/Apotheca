@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -7,14 +7,18 @@ class LotCreate(BaseModel):
     medication_id: str
     quantity: int = Field(ge=0, default=0)
     expiry_date: datetime | None = None
-    daily_dose: float | None = None
+    daily_dose: float | None = Field(default=None, ge=0)
+    treatment_days: float | None = Field(default=None, ge=0)
+    dose_start_date: date | None = None
     acquired_at: datetime | None = None
 
 
 class LotUpdate(BaseModel):
     quantity: int | None = Field(ge=0, default=None)
     expiry_date: datetime | None = None
-    daily_dose: float | None = None
+    daily_dose: float | None = Field(default=None, ge=0)
+    treatment_days: float | None = Field(default=None, ge=0)
+    dose_start_date: date | None = None
     acquired_at: datetime | None = None
 
 
@@ -25,6 +29,9 @@ class LotResponse(BaseModel):
     quantity: int
     expiry_date: datetime | None = None
     daily_dose: float | None = None
+    treatment_days: float | None = None
+    dose_start_date: date | None = None
+    effective_quantity: float | None = None
     acquired_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
@@ -81,6 +88,9 @@ class AlertItem(BaseModel):
     quantity: int
     expiry_date: datetime | None = None
     daily_dose: float | None = None
+    treatment_days: float | None = None
+    dose_start_date: date | None = None
+    effective_quantity: float | None = None
     days_until_expiry: int | None = None
     days_until_depleted: float | None = None
     alert_type: str

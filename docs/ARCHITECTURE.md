@@ -30,7 +30,7 @@ apotheca/
 - **ActiveIngredient** — principios activos (únicos)
 - **Presentation** — formas farmacéuticas (únicas)
 - **Medication** — medicamentos con national_code (CIMA nregistro), nombre, laboratorio, barcode, CIMA_data (JSON cache)
-- **Lot** — lotes: cantidad, fecha caducidad, dosis, dosis diaria
+- **Lot** — lotes: cantidad, fecha caducidad, dosis diaria (X al día), duración del tratamiento (Y días), fecha de inicio de la toma
 - **Settings** — configuración clave-valor (expiry_warning_days, depletion_threshold_days, ntfy_url, ntfy_topic)
 - **NotificationLog** — registro de notificaciones enviadas
 - **AuditLog** — registro de acciones (login, register, password reset)
@@ -70,6 +70,6 @@ apotheca/
 ## Flujo principal
 1. Buscar medicamento (CIMA por nombre o principio activo)
 2. Añadir al inventario (carga datos de CIMA automáticamente)
-3. Crear lotes (cantidad, caducidad, dosis, dosis diaria)
-4. Consultar alertas (caducidad próxima, agotamiento estimado)
+3. Crear lotes (cantidad, caducidad, dosis diaria X, duración del tratamiento Y días, fecha de inicio de la toma)
+4. Consultar alertas (caducidad próxima, agotamiento estimado con descuento virtual progresivo)
 5. Configurar thresholds y notificaciones ntfy

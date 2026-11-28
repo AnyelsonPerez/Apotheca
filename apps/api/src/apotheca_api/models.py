@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timezone
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from apotheca_api.database import Base
@@ -89,12 +89,58 @@ class Lot(Base):
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     expiry_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     daily_dose: Mapped[float | None] = mapped_column(Float, nullable=True)
+    treatment_days: Mapped[float | None] = mapped_column(Float, nullable=True)
+    dose_start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     acquired_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     medication: Mapped["Medication"] = relationship(back_populates="lots")
     user: Mapped["User"] = relationship(back_populates="lots")
+
+    @property
+    def effective_quantity(self) -> float:
+        eff, _, _ = compute_dose_consumption(
+            self.quantity, self.daily_dose, self.treatment_days, self.dose_start_date
+        )
+        return round(eff, 1)
+
+
+def compute_dose_consumption(
+    quantity: int | float,
+    daily_dose: float | None,
+    treatment_days: float | None,
+    dose_start_date: date | None,
+    now: date | None = None,
+) -> tuple[float, float | None, bool]:
+    """Calculate remaining stock after daily-dose consumption.
+
+    Returns (effective_quantity, days_until_depleted, is_actively_consuming).
+    The discount is virtual: it is computed on read and never mutates ``quantity``.
+    """
+    if not daily_dose or daily_dose <= 0 or not dose_start_date:
+        return float(quantity), None, False
+
+    today = now or datetime.now().date()
+    if dose_start_date > today:
+        return float(quantity), None, False
+
+    elapsed_days = (today - dose_start_date).days
+    if treatment_days is not None and treatment_days >= 0:
+        consuming_days = min(float(elapsed_days), treatment_days)
+        treatment_finished = elapsed_days >= treatment_days
+    else:
+        consuming_days = float(elapsed_days)
+        treatment_finished = False
+
+    consumed = daily_dose * max(consuming_days, 0.0)
+    effective = max(0.0, float(quantity) - consumed)
+
+    if treatment_finished:
+        return effective, (0.0 if effective <= 0 else None), False
+
+    days_left = effective / daily_dose if daily_dose > 0 else None
+    return effective, days_left, True
 
 
 class Settings(Base):
