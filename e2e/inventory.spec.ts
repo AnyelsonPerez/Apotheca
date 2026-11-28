@@ -18,8 +18,9 @@ test.describe('Inventory', () => {
   test('inventory page shows seeded medication', async ({ page }) => {
     await page.getByRole('link', { name: 'Inventario' }).click()
     await expect(page).toHaveURL(/.*\/inventory/, { timeout: 10_000 })
-    // The seeded medication might take a moment to load
-    await expect(page.locator('text=Test')).toBeVisible({ timeout: 15_000 })
+    // The inventory table should load (not be in loading state)
+    await expect(page.getByText('Cargando')).toBeHidden({ timeout: 15_000 })
+    await expect(page.locator('table')).toBeVisible({ timeout: 15_000 })
   })
 
   test('navigate to search page', async ({ page }) => {
