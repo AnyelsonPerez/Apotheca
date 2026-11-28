@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:49200',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
   },
   projects: [
     {
