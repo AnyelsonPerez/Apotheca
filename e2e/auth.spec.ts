@@ -17,8 +17,8 @@ test.describe('Auth flow', () => {
     // Should redirect to dashboard (protected route)
     await expect(page).toHaveURL(/.*\//, { timeout: 15_000 })
     // Dashboard should show nav items
-    await expect(page.getByText('Dashboard')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText('Inventario')).toBeVisible()
+    await expect(page.getByRole('main').getByText('Dashboard')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('link', { name: 'Inventario' })).toBeVisible()
   })
 
   test('login with seeded user and logout', async ({ page }) => {
@@ -29,10 +29,10 @@ test.describe('Auth flow', () => {
     await page.getByRole('button', { name: /entrar/i }).click()
 
     // Should see dashboard
-    await expect(page.getByText('Dashboard')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('main').getByText('Dashboard')).toBeVisible({ timeout: 15_000 })
 
     // Logout
-    await page.getByText('Cerrar sesión').click()
+    await page.getByText('Cerrar sesión', { exact: true }).click()
     // Should redirect back to login
     await expect(page.locator('text=Inicia sesión')).toBeVisible({ timeout: 10_000 })
   })
