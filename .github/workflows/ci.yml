@@ -28,7 +28,7 @@ jobs:
         run: uv python install
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --frozen
 
       - name: Run tests with coverage
         run: uv run pytest --cov --cov-report=xml --tb=short -v
@@ -63,8 +63,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run tests
-        run: pnpm --filter @apotheca/web test
+      - name: Run tests with coverage
+        run: pnpm --filter @apotheca/web exec vitest run --coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-web
+          path: apps/web/coverage/lcov.info
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Build
         run: pnpm --filter @apotheca/web build
@@ -87,8 +96,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run tests
-        run: pnpm --filter @apotheca/mobile test
+      - name: Run tests with coverage
+        run: pnpm --filter @apotheca/mobile exec vitest run --coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-mobile
+          path: apps/mobile/coverage/lcov.info
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Type check
         run: pnpm --filter @apotheca/mobile exec tsc --noEmit
@@ -115,14 +133,6 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Set up Python for seed script
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.12'
-
-      - name: Install httpx for seed script
-        run: pip install httpx
-
       - name: Start Docker stack
         working-directory: infrastructure/docker
         run: |
@@ -144,8 +154,13 @@ jobs:
           echo "API did not become healthy"
           exit 1
 
-      - name: Run seed script
-        run: python e2e/fixtures/seed.py --base-url http://localhost:8000/api
+      - name: Run seed script (inside API container, bypasses CIMA)
+        working-directory: infrastructure/docker
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.test.yml \
+            exec -T api uv run python /app/e2e/fixtures/seed.py --base-url http://localhost:8000/api
 
       - name: Run Playwright tests
         run: pnpm test:e2e
@@ -182,6 +197,18 @@ jobs:
         with:
           name: coverage-api
           path: apps/api
+
+      - name: Download Web coverage
+        uses: actions/download-artifact@v7
+        with:
+          name: coverage-web
+          path: apps/web/coverage
+
+      - name: Download Mobile coverage
+        uses: actions/download-artifact@v7
+        with:
+          name: coverage-mobile
+          path: apps/mobile/coverage
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v5
