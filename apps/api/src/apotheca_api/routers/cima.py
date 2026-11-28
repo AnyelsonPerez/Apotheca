@@ -134,37 +134,87 @@ async def search_medications(
 
 
 @router.get("/barcode/{cn}")
-async def search_by_cn(cn: str, db: Session = Depends(get_db)):
-    """Search CIMA by codigo nacional (scanned barcode CN).
+async def search_by_cn(cn: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Search CIMA by a scanned barcode (EAN-13) or a raw CN/nregistro.
 
-    Spanish medication barcodes encode the 6-digit codigo nacional (CN).
-    The scanner reads the full EAN-13; we extract the CN digits and look it up.
+    Spanish medication barcodes are EAN-13 with this structure::
+
+        8470006794890
+        ||          |
+        |└─ CN (6) ─┘  codigo nacional de la presentacion
+        └─ 84 = Spain GS1 prefix (+ company padding)
+
+    Position 13 is the EAN-13 check digit.
+    The 6-digit CN lives in positions 7-12, **not** the first 6 digits.
     """
-    # Extract numeric digits (strip EAN-13 check digit / country prefix noise)
     digits = ''.join(c for c in cn if c.isdigit())
-    # CIMA expects the 6-digit CN. EAN-13 barcodes encode it as digits 1-6.
-    if len(digits) >= 6:
-        cn_clean = digits[:6]
+
+    if len(digits) == 13:
+        # EAN-13: positions 7-12 are the CN
+        cn_clean = digits[6:12]
+    elif len(digits) == 6:
+        # Already a CN
+        cn_clean = digits
     else:
+        # Could be an nregistro (5-7 digits) or unknown — try as CN first,
+        # then fall back to nregistro lookup if no results.
         cn_clean = digits
 
     client = get_cima_client()
-    try:
-        data = await client.search_by_cn(cn_clean)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Error consultando CIMA: {exc}",
-        )
+    resultados: list = []
 
-    resultados = data.get("resultados", []) or []
+    if cn_clean:
+        try:
+            data = await client.search_by_cn(cn_clean)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Error consultando CIMA: {exc}",
+            )
+        resultados = data.get("resultados", []) or []
+
+    # Fallback: if nothing found by CN, try the raw input as an nregistro
+    # via /medicamento (covers scanned/typed nregistros of any length).
+    if not resultados and digits:
+        try:
+            detail = await client.get_medication(digits)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Error consultando CIMA: {exc}",
+            )
+        if detail and "error" not in detail:
+            resultados = [detail]
+
     if not resultados:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontro medicamento con CN {cn_clean}",
+            detail=f"No se encontro medicamento para el codigo de barras {cn}",
         )
 
     med = resultados[0]
+    nregistro = str(med.get("nregistro")) if med.get("nregistro") else None
+
+    # Determine whether this user already has the medication in their inventory.
+    # "In inventory" means the user has at least one lot for a medication whose
+    # national_code matches the CIMA nregistro.
+    in_inventory = False
+    medication_id = None
+    total_quantity = 0
+    if nregistro:
+        cached = (
+            db.query(Medication)
+            .options(selectinload(Medication.lots))
+            .filter(Medication.national_code == nregistro)
+            .first()
+        )
+        if cached:
+            user_lots = [lot for lot in cached.lots if lot.user_id == user.id]
+            if user_lots:
+                in_inventory = True
+                medication_id = cached.id
+                total_quantity = sum(lot.quantity for lot in user_lots)
+
     return {
         "nregistro": med.get("nregistro"),
         "nombre": med.get("nombre"),
@@ -173,6 +223,9 @@ async def search_by_cn(cn: str, db: Session = Depends(get_db)):
         "cpresc": med.get("cpresc"),
         "comerc": med.get("comerc"),
         "dosis": med.get("dosis"),
+        "in_inventory": in_inventory,
+        "medication_id": medication_id,
+        "total_quantity": total_quantity,
     }
 
 
