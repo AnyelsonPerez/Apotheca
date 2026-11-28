@@ -18,7 +18,7 @@ from sqlalchemy.orm import sessionmaker
 def _insert_medication_lot(db_url: str, user_id: str) -> None:
     """Insert a test medication and lot directly into the database."""
     from apotheca_api.database import Base
-    from apotheca_api.models import Medication, Lot
+    from apotheca_api.models import ActiveIngredient, Medication, Lot, Presentation
 
     engine = create_engine(db_url)
     Base.metadata.create_all(bind=engine)
@@ -27,6 +27,11 @@ def _insert_medication_lot(db_url: str, user_id: str) -> None:
     try:
         existing = session.query(Medication).filter(Medication.national_code == "659818").first()
         if not existing:
+            ai = ActiveIngredient(id="e2e-test-ai-001", name="Test Active Ingredient")
+            pres = Presentation(id="e2e-test-pres-001", name="Test Presentation")
+            session.add_all([ai, pres])
+            session.flush()
+
             med = Medication(
                 id="e2e-test-med-001",
                 national_code="659818",
@@ -35,6 +40,8 @@ def _insert_medication_lot(db_url: str, user_id: str) -> None:
                 dosage="400 mg",
                 prescription=False,
                 CIMA_data=json.dumps({"nregistro": "659818", "nombre": "Test Medication"}),
+                active_ingredient_id=ai.id,
+                presentation_id=pres.id,
             )
             session.add(med)
             session.flush()
