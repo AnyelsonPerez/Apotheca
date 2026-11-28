@@ -8,12 +8,21 @@
     "dev:mobile": "pnpm --filter @apotheca/mobile start",
     "build:web": "pnpm --filter @apotheca/web build",
     "lint:web": "pnpm --filter @apotheca/web lint",
-    "render-icons": "node scripts/render-icons.js"
+    "render-icons": "node scripts/render-icons.js",
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
+    "test:e2e:ui": "playwright test --config=e2e/playwright.config.ts --ui"
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@resvg/resvg-js": "^2.6.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "react": "19.3.1",
+      "react-dom": "19.3.1"
+    }
   }
 }

@@ -12,7 +12,7 @@ const DEFAULT_API_URL = __DEV__
 const API_SUFFIX = '/api'
 
 /** Normalise a user-entered server URL: strip trailing slashes, append /api if missing. */
-function normaliseApiUrl(raw: string): string {
+export function normaliseApiUrl(raw: string): string {
   const clean = raw.trim().replace(/\/+$/, '')
   if (!/^https?:\/\//i.test(clean)) throw new Error('URL inválida: debe empezar por http:// o https://')
   // Append /api if the user hasn't already
