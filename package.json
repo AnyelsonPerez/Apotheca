@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Self-hosted pharmacy management system",
+  "packageManager": "pnpm@10.26.0",
   "scripts": {
     "dev:web": "pnpm --filter @apotheca/web dev",
     "dev:mobile": "pnpm --filter @apotheca/mobile start",
@@ -18,11 +19,5 @@
   "devDependencies": {
     "@playwright/test": "^1.52.0",
     "@resvg/resvg-js": "^2.6.2"
-  },
-  "pnpm": {
-    "overrides": {
-      "react": "19.3.1",
-      "react-dom": "19.3.1"
-    }
   }
 }
