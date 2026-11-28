@@ -59,6 +59,9 @@ out/
 .nuxt/
 .cache/
 
+# Coverage
+coverage/
+
 # Logs
 logs/
 *.log
