@@ -1,4 +1,5 @@
 """Integration tests for the auth router: register, login, refresh, password reset."""
+from apotheca_api.config import settings
 from apotheca_api.models import AuditLog, User
 from apotheca_api.security import decode_token
 
@@ -134,7 +135,15 @@ class TestRefresh:
 
 
 class TestPasswordReset:
-    def test_request_reset_for_existing_user(self, seeded_client):
+    def test_request_reset_for_existing_user_hides_dev_token_by_default(self, seeded_client):
+        res = seeded_client.post("/api/auth/password-reset", json={"email": "test@example.com"})
+        assert res.status_code == 202
+        body = res.json()
+        assert body["message"] == "If the email is registered, a reset link has been sent"
+        assert "dev_token" not in body
+
+    def test_request_reset_returns_dev_token_in_debug_mode(self, seeded_client, monkeypatch):
+        monkeypatch.setattr(settings, "debug", True)
         res = seeded_client.post("/api/auth/password-reset", json={"email": "test@example.com"})
         assert res.status_code == 202
         body = res.json()
@@ -147,7 +156,8 @@ class TestPasswordReset:
         assert body["message"] == "If the email is registered, a reset link has been sent"
         assert "dev_token" not in body
 
-    def test_confirm_password_reset_success(self, seeded_client, db_session):
+    def test_confirm_password_reset_success(self, seeded_client, db_session, monkeypatch):
+        monkeypatch.setattr(settings, "debug", True)
         # Request reset
         reset_res = seeded_client.post("/api/auth/password-reset", json={"email": "test@example.com"})
         dev_token = reset_res.json()["dev_token"]
@@ -173,7 +183,8 @@ class TestPasswordReset:
         })
         assert res.status_code == 400
 
-    def test_confirm_reset_with_short_password_rejected(self, seeded_client):
+    def test_confirm_reset_with_short_password_rejected(self, seeded_client, monkeypatch):
+        monkeypatch.setattr(settings, "debug", True)
         reset_res = seeded_client.post("/api/auth/password-reset", json={"email": "test@example.com"})
         dev_token = reset_res.json()["dev_token"]
 

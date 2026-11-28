@@ -109,8 +109,11 @@ def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(
 
     _log_action(db, user.id, "password_reset_request", "user", user.id)
 
-    # In a real app we would email the token. For now it is returned in the response (dev only).
-    return {"message": "If the email is registered, a reset link has been sent", "dev_token": token}
+    # In a real app we would email the token. In debug mode it is returned in the response.
+    response = {"message": "If the email is registered, a reset link has been sent"}
+    if settings.debug:
+        response["dev_token"] = token
+    return response
 
 
 @router.post("/password-reset/confirm", status_code=status.HTTP_200_OK)
