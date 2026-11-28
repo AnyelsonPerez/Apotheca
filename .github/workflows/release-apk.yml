@@ -64,9 +64,14 @@ jobs:
 
           # Enable Gradle build cache (configuration-cache is NOT compatible
           # with React Native's build.gradle which calls node during config phase)
+          # Prebuild writes gradle.properties without a trailing newline, so
+          # always ensure one before appending to avoid concatenating with the
+          # last line (expo.inlineModules.watchedDirectories=[]).
           if grep -q "^org.gradle.caching=" "$PROPS"; then
             sed -i 's/^org.gradle.caching=.*/org.gradle.caching=true/' "$PROPS"
           else
+            # Ensure the file ends with a newline before appending.
+            [ -n "$(tail -c1 "$PROPS")" ] && echo "" >> "$PROPS"
             echo "org.gradle.caching=true" >> "$PROPS"
           fi
 
