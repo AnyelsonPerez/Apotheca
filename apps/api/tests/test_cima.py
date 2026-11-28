@@ -1,7 +1,7 @@
 """Unit tests for the CIMA client with HTTP mocked via respx — no real network calls."""
 import respx
 import pytest
-from httpx import Response, HTTPStatusError
+from httpx import Response, HTTPStatusError, ConnectError
 
 from apotheca_api.cima import CIMA_BASE_URL, CimaClient
 
@@ -80,9 +80,9 @@ class TestCimaClientGetMedication:
 class TestCimaClientErrorHandling:
     @respx.mock
     async def test_network_error_raises_exception(self):
-        respx.get(f"{CIMA_BASE_URL}/medicamentos").mock(side_effect=ConnectionError("DNS failed"))
+        respx.get(f"{CIMA_BASE_URL}/medicamentos").mock(side_effect=ConnectError("DNS failed"))
         client = CimaClient()
-        with pytest.raises(Exception):
+        with pytest.raises(ConnectError):
             await client.search_by_name("test")
 
     @respx.mock
