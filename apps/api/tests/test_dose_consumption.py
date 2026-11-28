@@ -50,6 +50,7 @@ class TestComputeDoseConsumption:
             quantity=20, daily_dose=3, treatment_days=5, dose_start_date=date(2026, 11, 24), now=self.today
         )
         assert eff == 11.0  # 20 - 9
+        assert days_left is not None
         assert days_left == round(11.0 / 3, 10) or abs(days_left - 11.0 / 3) < 0.01
         assert consuming is True
 
