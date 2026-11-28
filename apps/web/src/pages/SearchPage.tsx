@@ -56,6 +56,8 @@ export function SearchPage() {
           labtitular: result.labtitular,
           dosis: result.dosis,
           cpresc: result.cpresc,
+          in_inventory: result.in_inventory,
+          medication_id: result.medication_id,
         },
       })
       setScannerOpen(false)
@@ -196,6 +198,11 @@ export function SearchPage() {
       >
         <Stack>
           <Text size="sm" c="dimmed">{lotModal?.med.nombre}</Text>
+          {lotModal?.med.in_inventory && (
+            <Badge variant="light" color="teal" w="fit-content" leftSection={<IconCheck size={10} />}>
+              En inventario
+            </Badge>
+          )}
           {lotModal?.med.dosis && (
             <Badge variant="light" color="blue" w="fit-content">{lotModal.med.dosis}</Badge>
           )}

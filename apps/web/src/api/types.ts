@@ -89,6 +89,9 @@ export interface CimaBarcodeResult {
   cpresc: string
   comerc: boolean
   dosis: string
+  in_inventory: boolean
+  medication_id: string | null
+  total_quantity: number
 }
 
 export interface CimaSearchResponse {
